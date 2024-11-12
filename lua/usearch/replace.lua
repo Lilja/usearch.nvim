@@ -32,6 +32,9 @@ function M.open_file_and_change_it(file_path, changes)
 	end
 	new_file:write(table.concat(new_contents, "\n"))
 	new_file:close()
+
+	-- Close the buffer
+	vim.api.nvim_buf_delete(buf, { force = true })
 end
 
 --- Perform a search and replace on a file_path. The changes are a list of line numbers and the new content to replace the line with.
