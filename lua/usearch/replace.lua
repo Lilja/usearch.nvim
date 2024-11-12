@@ -12,13 +12,16 @@ function M.open_file_and_change_it(file_path, changes)
 	if file == nil then
 		error("File not found")
 	end
-	file:close()
 
 	local contents = file:read("*a")
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(contents, "\n"))
 
+	file:close()
+
 	for line_no, new_content in pairs(changes) do
-		vim.api.nvim_buf_set_lines(buf, line_no, line_no, false, { new_content })
+		print("Changing line " .. line_no .. " to " .. new_content)
+		-- Add +1 to the line number as lua is 1 indexed, these line numbers from rg are 0 indexed
+		vim.api.nvim_buf_set_lines(buf, line_no+1, line_no+1, false, { new_content })
 	end
 
 	-- Write the changes to back to the file

@@ -35,6 +35,8 @@ function M.bind_keybinds_to_buf(buf, next, prev)
 	vim.api.nvim_buf_set_keymap(buf, "n", "<C-p>", cmdPrev, { noremap = true, silent = true })
 
 	-- Bind <leader>R to perform the search and replace
+	-- TODO: This should be a keybind that is set in the user's config
+	-- TODO: This should not call a function in the UI module, but rather in the main module
 	vim.api.nvim_buf_set_keymap(
 		buf,
 		"n",
@@ -110,7 +112,7 @@ function perform_search()
 	M.reduce_output_state()
 end
 
-function perform_replace()
+function M.perform_replace()
 	if state.regex == nil or state.regex == "" then
 		return
 	end
