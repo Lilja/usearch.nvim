@@ -1,6 +1,5 @@
 local M = {}
 
-
 --- Changes the contents of a file_path. The changes are a list of line numbers and the new content to replace the line with.
 --- @param file_path string
 --- @param changes { [number]: string }
@@ -13,12 +12,23 @@ function M.open_file_and_change_it(file_path, changes)
 	if file == nil then
 		error("File not found")
 	end
+	file:close()
+
 	local contents = file:read("*a")
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(contents, "\n"))
 
 	for line_no, new_content in pairs(changes) do
 		vim.api.nvim_buf_set_lines(buf, line_no, line_no, false, { new_content })
 	end
+
+	-- Write the changes to back to the file
+	local new_contents = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+	local new_file = io.open(file_path, "w")
+	if new_file == nil then
+		error("Failed to open file for writing")
+	end
+	new_file:write(table.concat(new_contents, "\n"))
+	new_file:close()
 end
 
 --- Perform a search and replace on a file_path. The changes are a list of line numbers and the new content to replace the line with.
@@ -59,6 +69,7 @@ function M.perform_replace_on_file_path(file_path, line_numbers, search, replace
 			table.insert(lines, line)
 			last_line = line
 		end
+		handle:close()
 
 		local result = lines[1]
 
@@ -66,13 +77,9 @@ function M.perform_replace_on_file_path(file_path, line_numbers, search, replace
 			return { data = nil, error = { "Failed to execute command", result, sed_command } }
 		end
 
-
-		handle:close()
 		changes[line_no] = result
 	end
 
-	print("The changes are:")
-	print(vim.inspect(changes))
 	return { data = changes, error = nil }
 end
 

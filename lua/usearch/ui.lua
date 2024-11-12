@@ -31,6 +31,17 @@ function M.bind_keybinds_to_buf(buf, next, prev)
 	local cmdPrev = ":lua require('" .. state.pkg .. ".ui').switch_to_window('" .. prev .. "')<CR>"
 	vim.api.nvim_buf_set_keymap(buf, "n", "<Tab>", cmdNext, { noremap = true, silent = true })
 	vim.api.nvim_buf_set_keymap(buf, "n", "<S-Tab>", cmdPrev, { noremap = true, silent = true })
+	vim.api.nvim_buf_set_keymap(buf, "n", "<C-n>", cmdNext, { noremap = true, silent = true })
+	vim.api.nvim_buf_set_keymap(buf, "n", "<C-p>", cmdPrev, { noremap = true, silent = true })
+
+	-- Bind <leader>R to perform the search and replace
+	vim.api.nvim_buf_set_keymap(
+		buf,
+		"n",
+		"<leader>R",
+		":lua require('" .. state.pkg .. ".ui').perform_replace()<CR>",
+		{ noremap = true, silent = true }
+	)
 end
 
 function M.close_window()
@@ -96,25 +107,36 @@ function perform_search()
 	local matches = matchesResult.data
 	state.last_matches = process.group_up_matches_and_craft_meta_data(matches)
 
+	M.reduce_output_state()
+end
+
+function perform_replace()
+	if state.regex == nil or state.regex == "" then
+		return
+	end
+
 	if state.replacer ~= nil then
-		print("Performing replace")
 		for file_path, result in pairs(state.last_matches.grouped_matches) do
 			-- Flatten out the results to a number[]
 			local line_numbers = {}
 			for _, line_no in pairs(result.matches) do
 				table.insert(line_numbers, line_no)
 			end
-			print("Matches: " .. vim.inspect(result.matches) .. " " .. vim.inspect(line_numbers))
-			print("Performing replace on file: " .. file_path)
 			local replaceResult = replace.perform_replace_on_file_path(file_path, line_numbers, state.regex, state.replacer)
 			if replaceResult.error ~= nil then
 				state.error = replaceResult.error
 				M.reduce_output_state()
 				return
 			end
+			local data = replaceResult.data
+			if data == nil then
+				state.error = { "Failed to replace" }
+				M.reduce_output_state()
+				return
+			end
+			replace.open_file_and_change_it(file_path, data)
 		end
 	end
-	M.reduce_output_state()
 end
 
 --- @param mode "new" | "toggle"
@@ -136,7 +158,6 @@ function M.drawUI(mode)
 	vim.api.nvim_buf_set_option(outputBuf, "buftype", "nofile")
 
 	M.listen_for_mode_change_in_buf(searchBuf, outputBuf, function(contents)
-		print("Search contents changed!")
 		local regex = contents[1]
 		state.initial = false
 		state.regex = regex
@@ -147,14 +168,12 @@ function M.drawUI(mode)
 		state.initial = false
 		state.replacer = contents[1]
 		state.error = nil
-		print("Replace contents changed!")
 		perform_search()
 	end)
 	M.listen_for_mode_change_in_buf(ignoreBuf, outputBuf, function(contents)
 		state.initial = false
 		state.ignore = contents[1]
 		state.error = nil
-		print("Ignore contents changed!")
 		perform_search()
 	end)
 
