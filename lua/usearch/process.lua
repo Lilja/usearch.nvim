@@ -18,14 +18,7 @@ function M.group_up_matches_and_craft_meta_data(matches)
 		count = count + 1
 	end
 
-	print("Matches count: " .. count)
-	if count > 1000 then
-		print("Count: " .. count)
-		error("Warning: too many matches found. This may slow down the editor.")
-	end
-
 	for _, m in ipairs(matches) do
-		print("Processing match: " .. m["file_path"])
 		local key = m["file_path"]
 		if grouped_matches[key] == nil then
 			grouped_matches[key] = {

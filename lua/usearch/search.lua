@@ -1,8 +1,9 @@
 local M = {}
 
 --- @param regex string
+--- @param ignore string|nil
 --- @return { file_path: string, line_no: string }[]
-function M.search(regex)
+function M.search(regex, ignore)
 	local rg_args = {
 		"--color=never",
 		"--no-heading",
@@ -12,7 +13,12 @@ function M.search(regex)
 	}
 
 	local rg_flags = table.concat(rg_args, " ")
-	local handle = io.popen("rg " .. rg_flags .. " " .. regex)
+	if ignore ~= nil then
+		rg_flags = rg_flags .. " -g '!" .. ignore .. "'"
+	end
+	local cmd = "rg " .. rg_flags .. " " .. regex
+	print("Running command: " .. cmd)
+	local handle = io.popen(cmd)
 	if handle == nil then
 		error("Stuff")
 	end

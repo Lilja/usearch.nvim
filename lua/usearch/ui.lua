@@ -22,23 +22,47 @@ function M.listen_for_mode_change_in_buf(buf, outputBuf, callback)
 	})
 end
 
-function M.bind_tab_to_next_window(buf, currentWindow, nextWindow)
-	local cmdNext = ":lua vim.api.nvim_set_current_win(" .. nextWindow .. ")<CR>"
-	local cmdPrev = ":lua vim.api.nvim_set_current_win(" .. currentWindow .. ")<CR>"
+--- @param buf number
+--- @param next "search" | "replace" | "ignore" | "output"
+--- @param prev "search" | "replace" | "ignore" | "output"
+function M.bind_keybinds_to_buf(buf, next, prev)
+	local cmdNext = ":lua require('" .. state.pkg .. ".ui').switch_to_window('" .. next .. "')<CR>"
+	local cmdPrev = ":lua require('" .. state.pkg .. ".ui').switch_to_window('" .. prev .. "')<CR>"
 	vim.api.nvim_buf_set_keymap(buf, "n", "<Tab>", cmdNext, { noremap = true, silent = true })
 	vim.api.nvim_buf_set_keymap(buf, "n", "<S-Tab>", cmdPrev, { noremap = true, silent = true })
 end
 
 function M.closeWindow()
-	for _, win in ipairs(state.windows) do
-		if vim.api.nvim_win_is_valid(win) then
-			vim.api.nvim_win_close(win, true)
-		end
+	if vim.api.nvim_win_is_valid(state.searchWin) then
+		vim.api.nvim_win_close(state.searchWin, true)
+	end
+	if vim.api.nvim_win_is_valid(state.replaceWin) then
+		vim.api.nvim_win_close(state.replaceWin, true)
+	end
+	if vim.api.nvim_win_is_valid(state.outputWin) then
+		vim.api.nvim_win_close(state.outputWin, true)
+	end
+	if vim.api.nvim_win_is_valid(state.ignoreWin) then
+		vim.api.nvim_win_close(state.ignoreWin, true)
+	end
+
+
+	if vim.api.nvim_buf_is_loaded(state.searchBuf) then
+		vim.api.nvim_buf_delete(state.searchBuf, { force = true })
+	end
+	if vim.api.nvim_buf_is_loaded(state.replaceBuf) then
+		vim.api.nvim_buf_delete(state.replaceBuf, { force = true })
+	end
+	if vim.api.nvim_buf_is_loaded(state.outputBuf) then
+		vim.api.nvim_buf_delete(state.outputBuf, { force = true })
+	end
+	if vim.api.nvim_buf_is_loaded(state.ignoreBuf) then
+		vim.api.nvim_buf_delete(state.ignoreBuf, { force = true })
 	end
 end
 
 function M.bind_escape_to_all_buffers()
-	for _, buf in ipairs(state.buffers) do
+	for _, buf in ipairs({ state.searchBuf, state.replaceBuf, state.outputBuf, state.ignoreBuf }) do
 		vim.api.nvim_buf_set_keymap(
 			buf,
 			"n",
@@ -59,6 +83,15 @@ function render_search_results(results)
 	return lines
 end
 
+function perform_search()
+	if state.regex == nil or state.regex == "" then
+		return
+	end
+	local matches = search.search(state.regex, state.ignore)
+	state.last_matches = process.group_up_matches_and_craft_meta_data(matches)
+	M.reduce_output_state()
+end
+
 function M.drawUI()
 	-- Create search buffer for the floating window
 	local searchBuf = vim.api.nvim_create_buf(false, false)
@@ -66,6 +99,10 @@ function M.drawUI()
 
 	-- Create replace buffer for the floating window
 	local replaceBuf = vim.api.nvim_create_buf(false, false)
+	vim.api.nvim_buf_set_option(replaceBuf, "buftype", "nofile")
+
+	-- Create ignore buffer for the floating window
+	local ignoreBuf = vim.api.nvim_create_buf(false, false)
 	vim.api.nvim_buf_set_option(replaceBuf, "buftype", "nofile")
 
 	-- Create output buffer for the floating window
@@ -77,19 +114,17 @@ function M.drawUI()
 		local regex = contents[1]
 		state.initial = false
 		state.regex = regex
-		if regex == nil or regex == "" then
-			M.reduce_output_state()
-			return
-		end
-		local matches = search.search(state.regex)
-		state.last_matches = process.group_up_matches_and_craft_meta_data(matches)
-		M.reduce_output_state()
+		perform_search()
 	end)
 	M.listen_for_mode_change_in_buf(replaceBuf, outputBuf, function(contents)
 		state.initial = false
-		print("Replace contents changed!")
-		print(vim.inspect(contents))
-		M.reduce_output_state()
+		state.replace = contents[1]
+		perform_search()
+	end)
+	M.listen_for_mode_change_in_buf(ignoreBuf, outputBuf, function(contents)
+		state.initial = false
+		state.ignore = contents[1]
+		perform_search()
 	end)
 
 	-- Create the search buffer, it's located on the top of the screen
@@ -117,6 +152,19 @@ function M.drawUI()
 		title_pos = "center",
 	})
 
+	-- Create the ignore buffer, it's located below the replace buffer
+	local ignoreWin = vim.api.nvim_open_win(ignoreBuf, true, {
+		relative = "editor",
+		width = 40,
+		height = 1,
+		row = 7,
+		col = 10,
+		style = "minimal",
+		border = "rounded",
+		title = "Ignore",
+		title_pos = "center",
+	})
+
 	-- Finally, create the floating window that will show the results of the search and replace
 	-- It's located to the right of both the search and replace buffers
 	local outputWin = vim.api.nvim_open_win(outputBuf, true, {
@@ -131,26 +179,40 @@ function M.drawUI()
 		title_pos = "center",
 	})
 
-	M.bind_tab_to_next_window(searchBuf, searchWin, replaceWin)
-	M.bind_tab_to_next_window(replaceBuf, replaceWin, outputWin)
-	M.bind_tab_to_next_window(outputBuf, outputWin, searchWin)
-
-	state.windows = { searchWin, replaceWin, outputWin }
-	state.buffers = { searchBuf, replaceBuf, outputBuf }
+	-- Bind keybinds to the buffers, you should navigate vertically and then switch to the output buffer, and back to the search buffer.
+	M.bind_keybinds_to_buf(searchBuf, "replace", "output")
+	M.bind_keybinds_to_buf(replaceBuf, "ignore", "search")
+	M.bind_keybinds_to_buf(ignoreBuf, "output", "replace")
+	M.bind_keybinds_to_buf(outputBuf, "search", "ignore")
 
 	state.searchWin = searchWin
 	state.replaceWin = replaceWin
 	state.outputWin = outputWin
+	state.ignoreWin = ignoreWin
 
 	state.searchBuf = searchBuf
 	state.replaceBuf = replaceBuf
 	state.outputBuf = outputBuf
+	state.ignoreBuf = ignoreBuf
 
 	M.bind_escape_to_all_buffers()
 
 	-- Focus the search window
 	vim.api.nvim_set_current_win(searchWin)
 	M.reduce_output_state()
+end
+
+--- @param win "search" | "replace" | "ignore" | "output"
+function M.switch_to_window(win)
+	if win == "search" then
+		vim.api.nvim_set_current_win(state.searchWin)
+	elseif win == "replace" then
+		vim.api.nvim_set_current_win(state.replaceWin)
+	elseif win == "ignore" then
+		vim.api.nvim_set_current_win(state.ignoreWin)
+	elseif win == "output" then
+		vim.api.nvim_set_current_win(state.outputWin)
+	end
 end
 
 --- @param data_to_render string[]
