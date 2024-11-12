@@ -106,7 +106,12 @@ function perform_search()
 			end
 			print("Matches: " .. vim.inspect(result.matches) .. " " .. vim.inspect(line_numbers))
 			print("Performing replace on file: " .. file_path)
-			replace.perform_replace_on_file_path(file_path, line_numbers, state.regex, state.replacer)
+			local replaceResult = replace.perform_replace_on_file_path(file_path, line_numbers, state.regex, state.replacer)
+			if replaceResult.error ~= nil then
+				state.error = replaceResult.error
+				M.reduce_output_state()
+				return
+			end
 		end
 	end
 	M.reduce_output_state()

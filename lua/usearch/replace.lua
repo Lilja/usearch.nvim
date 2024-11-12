@@ -26,7 +26,7 @@ end
 --- @param line_numbers number[]
 --- @param search string
 --- @param replacer string
---- @return { line_no: string }[]
+--- @return { data: { [number]: string } | nil, error: string[] | nil }
 function M.perform_replace_on_file_path(file_path, line_numbers, search, replacer)
 	--- @type { [number]: string }
 	local changes = {}
@@ -45,23 +45,35 @@ function M.perform_replace_on_file_path(file_path, line_numbers, search, replace
 
 		-- We want to pipe the output of the first command to the second command, we don't want to do the replacement in the file,
 		-- As we want neovim to perform the replacement, making undo/redo easier for the user.
-		-- We also want to remove the newline character at the end of the line, as we will be replacing the entire line.
-		local sed_command = sed_read_line_command .. " | " .. sed_replace_command .. " | tr -d '\\n'"
-
-		print("The command is: " .. sed_command)
+		-- Finally, we want to print the exit code of the command, so we can check if the command was successful.
+		local sed_command = sed_read_line_command .. " | " .. sed_replace_command .. " 2>&1 ; echo $?"
 
 		-- Finally, execute the command and get the output
 		local handle = io.popen(sed_command)
 		if handle == nil then
-			error("Failed to execute command")
+			return { data = nil, error = { "Failed to execute command", sed_command } }
 		end
-		local result = handle:read("*a")
+		local lines = {}
+		local last_line = nil
+		for line in handle:lines() do
+			table.insert(lines, line)
+			last_line = line
+		end
+
+		local result = lines[1]
+
+		if tonumber(last_line) ~= 0 then
+			return { data = nil, error = { "Failed to execute command", result, sed_command } }
+		end
+
+
 		handle:close()
-		table.insert(changes, { line_no = result })
+		changes[line_no] = result
 	end
 
 	print("The changes are:")
 	print(vim.inspect(changes))
+	return { data = changes, error = nil }
 end
 
 return M
