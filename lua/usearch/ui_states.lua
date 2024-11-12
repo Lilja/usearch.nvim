@@ -30,4 +30,13 @@ function M.display_matches()
 	return lines
 end
 
+
+function M.display_error()
+	local error = state.error
+	if type(error) == "table" then
+		return { "Error: ", "", unpack(error) }
+	end
+	return { "Error", "", error }
+end
+
 return M

@@ -28,6 +28,9 @@ local last_matches = {
 	grouped_matches = grouped_matches,
 }
 
+--- @type nil | string | string[]
+local error = nil
+
 local M = {
 	initial = true,
 
@@ -48,6 +51,8 @@ local M = {
 	pkg = pkg,
 
 	last_matches = last_matches,
+
+	error = error,
 }
 
 function M.reset_state()
@@ -73,6 +78,8 @@ function M.reset_state()
 		unique_file_paths = {},
 		grouped_matches = {},
 	}
+
+	M.error = nil
 
 end
 

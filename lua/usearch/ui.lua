@@ -2,6 +2,7 @@ local state = require("usearch.state")
 local ui_states = require("usearch.ui_states")
 local search = require("usearch.search")
 local process = require("usearch.process")
+local replace = require("usearch.replace")
 
 local M = {}
 
@@ -32,7 +33,7 @@ function M.bind_keybinds_to_buf(buf, next, prev)
 	vim.api.nvim_buf_set_keymap(buf, "n", "<S-Tab>", cmdPrev, { noremap = true, silent = true })
 end
 
-function M.closeWindow()
+function M.close_window()
 	if vim.api.nvim_win_is_valid(state.searchWin) then
 		vim.api.nvim_win_close(state.searchWin, true)
 	end
@@ -45,7 +46,6 @@ function M.closeWindow()
 	if vim.api.nvim_win_is_valid(state.ignoreWin) then
 		vim.api.nvim_win_close(state.ignoreWin, true)
 	end
-
 
 	if vim.api.nvim_buf_is_loaded(state.searchBuf) then
 		vim.api.nvim_buf_delete(state.searchBuf, { force = true })
@@ -67,7 +67,7 @@ function M.bind_escape_to_all_buffers()
 			buf,
 			"n",
 			"<Esc>",
-			":lua require('" .. state.pkg .. ".ui').closeWindow()<CR>",
+			":lua require('" .. state.pkg .. ".ui').close_window()<CR>",
 			{ noremap = true, silent = true }
 		)
 	end
@@ -87,12 +87,33 @@ function perform_search()
 	if state.regex == nil or state.regex == "" then
 		return
 	end
-	local matches = search.search(state.regex, state.ignore)
+	local matchesResult = search.search(state.regex, state.ignore)
+	if matchesResult.error ~= nil then
+		state.error = matchesResult.error
+		M.reduce_output_state()
+		return
+	end
+	local matches = matchesResult.data
 	state.last_matches = process.group_up_matches_and_craft_meta_data(matches)
+
+	if state.replacer ~= nil then
+		print("Performing replace")
+		for file_path, result in pairs(state.last_matches.grouped_matches) do
+			-- Flatten out the results to a number[]
+			local line_numbers = {}
+			for _, line_no in pairs(result.matches) do
+				table.insert(line_numbers, line_no)
+			end
+			print("Matches: " .. vim.inspect(result.matches) .. " " .. vim.inspect(line_numbers))
+			print("Performing replace on file: " .. file_path)
+			replace.perform_replace_on_file_path(file_path, line_numbers, state.regex, state.replacer)
+		end
+	end
 	M.reduce_output_state()
 end
 
-function M.drawUI()
+--- @param mode "new" | "toggle"
+function M.drawUI(mode)
 	-- Create search buffer for the floating window
 	local searchBuf = vim.api.nvim_create_buf(false, false)
 	vim.api.nvim_buf_set_option(searchBuf, "buftype", "nofile")
@@ -114,16 +135,21 @@ function M.drawUI()
 		local regex = contents[1]
 		state.initial = false
 		state.regex = regex
+		state.error = nil
 		perform_search()
 	end)
 	M.listen_for_mode_change_in_buf(replaceBuf, outputBuf, function(contents)
 		state.initial = false
-		state.replace = contents[1]
+		state.replacer = contents[1]
+		state.error = nil
+		print("Replace contents changed!")
 		perform_search()
 	end)
 	M.listen_for_mode_change_in_buf(ignoreBuf, outputBuf, function(contents)
 		state.initial = false
 		state.ignore = contents[1]
+		state.error = nil
+		print("Ignore contents changed!")
 		perform_search()
 	end)
 
@@ -197,6 +223,19 @@ function M.drawUI()
 
 	M.bind_escape_to_all_buffers()
 
+	if mode == "toggle" then
+		if state.regex ~= nil then
+			vim.api.nvim_buf_set_lines(searchBuf, 0, -1, false, { state.regex })
+		end
+		if state.replacer ~= nil then
+			vim.api.nvim_buf_set_lines(replaceBuf, 0, -1, false, { state.replacer })
+		end
+		if state.ignore ~= nil then
+			vim.api.nvim_buf_set_lines(ignoreBuf, 0, -1, false, { state.ignore })
+		end
+		perform_search()
+	end
+
 	-- Focus the search window
 	vim.api.nvim_set_current_win(searchWin)
 	M.reduce_output_state()
@@ -226,6 +265,11 @@ end
 function M.reduce_output_state()
 	if state.initial then
 		return M.render_output_state(ui_states.initial_state())
+	end
+
+	if state.error ~= nil then
+		print(vim.inspect(state.error))
+		return M.render_output_state(ui_states.display_error())
 	end
 
 	if state.regex == nil or state.last_matches.matches_count == 0 then

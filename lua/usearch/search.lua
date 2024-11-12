@@ -2,7 +2,7 @@ local M = {}
 
 --- @param regex string
 --- @param ignore string|nil
---- @return { file_path: string, line_no: string }[]
+--- @return { data: { file_path: string, line_no: string }[], error: string | string[] | nil }
 function M.search(regex, ignore)
 	local rg_args = {
 		"--color=never",
@@ -13,26 +13,42 @@ function M.search(regex, ignore)
 	}
 
 	local rg_flags = table.concat(rg_args, " ")
-	if ignore ~= nil then
+	if ignore ~= nil and ignore ~= "" then
 		rg_flags = rg_flags .. " -g '!" .. ignore .. "'"
 	end
-	local cmd = "rg " .. rg_flags .. " " .. regex
-	print("Running command: " .. cmd)
+	local cmd = "rg " .. rg_flags .. " " .. "'" .. regex .. "'" .. " 2>&1; echo $?"
 	local handle = io.popen(cmd)
 	if handle == nil then
-		error("Stuff")
+		return { data = {}, error = { "Failed to execute command", cmd } }
 	end
-	local result = handle:read("*a")
+	local lines = {}
+	local last_line = nil
+	for line in handle:lines() do
+		table.insert(lines, line)
+		last_line = line
+	end
+	handle:close()
+
+	-- The result is the output, but will now contain the exit code as the last line
+	-- We need to remove the last line
+	local result = table.concat(lines, "\n")
+
+	if tonumber(last_line) ~= 0 then
+		return { data = {}, error = { "Failed to execute command", unpack(lines), cmd } }
+	end
 
 	--- @type { file_path: string, line_no: string }
 	local matches = {}
 
 	for s in result:gmatch("[^\r\n]+") do
+		if s == "0" then
+			break
+		end
 		local m = process_result_row(vim.loop.cwd(), s, regex)
 		table.insert(matches, m)
 	end
 
-	return matches
+	return { data = matches, error = nil }
 end
 
 --- @param cwd string

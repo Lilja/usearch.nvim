@@ -58,11 +58,11 @@ function M.new_search()
 	local state = require("usearch.state")
 	state.reset_state()
 
-	ui.drawUI()
+	ui.drawUI("new")
 end
 
 function M.toggle_search()
-	ui.drawUI()
+	ui.drawUI("toggle")
 end
 
 return M
