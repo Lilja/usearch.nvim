@@ -4,19 +4,10 @@ local M = {}
 --- @param file_path string
 --- @param changes { [number]: string }
 function M.open_file_and_change_it(file_path, changes)
-	local buf = vim.api.nvim_create_buf(false, false)
-	vim.api.nvim_buf_set_name(buf, file_path)
+	local buf = vim.fn.bufadd(file_path)
+	vim.fn.bufload(buf)
 	-- Open the file, read the contents into the buffer
 	local file = io.open(file_path, "r")
-
-	if file == nil then
-		error("File not found")
-	end
-
-	local contents = file:read("*a")
-	vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(contents, "\n"))
-
-	file:close()
 
 	for line_no, new_content in pairs(changes) do
 		print("Changing line " .. line_no .. " to " .. new_content)
@@ -24,14 +15,10 @@ function M.open_file_and_change_it(file_path, changes)
 		vim.api.nvim_buf_set_lines(buf, line_no+1, line_no+1, false, { new_content })
 	end
 
-	-- Write the changes to back to the file
-	local new_contents = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-	local new_file = io.open(file_path, "w")
-	if new_file == nil then
-		error("Failed to open file for writing")
-	end
-	new_file:write(table.concat(new_contents, "\n"))
-	new_file:close()
+	-- Save the buffer
+	vim.api.nvim_buf_call(buf, function()
+		vim.cmd("write")
+	end)
 
 	-- Close the buffer
 	vim.api.nvim_buf_delete(buf, { force = true })
