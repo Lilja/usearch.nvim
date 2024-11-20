@@ -82,4 +82,74 @@ function process_result_row(cwd, row, search)
 	return { ["file_path"] = file_path, ["line_no"] = line_no }
 end
 
+--- @alias Submatch { match: string, start: number, finish: number }
+--- @alias SearchOutput { file_path: string, lines: string, line_number: number, submatches: Submatch[] }
+--- @param search string
+--- @return { data: SearchOutput[] | nil, error: string | string[] | nil }
+function M.search_with_json(search)
+	-- Perform a search with ripgrep using --json flag. This will return a more detailed output that we are able to later highlight in neovim.
+	local cmd = "rg --json " .. "'" .. search .. "' " .. " 2>&1; echo $?"
+	print("Executing command", cmd)
+	local handle = io.popen(cmd)
+	if handle == nil then
+		return { data = {}, error = { "Failed to execute command", cmd } }
+	end
+	local cmd_lines = {}
+	local last_line = nil
+	for line in handle:lines() do
+		-- If the line starts with "{" then it is a json output line
+		if line:sub(1, 1) == "{" then
+			local row = vim.fn.json_decode(line)
+			table.insert(cmd_lines, row)
+		end
+		last_line = line
+	end
+	handle:close()
+
+	if tonumber(last_line) ~= 0 then
+		return { data = nil, error = { "Failed to execute command", unpack(cmd_lines), cmd } }
+	end
+
+	-- Now we need to filter out the certain results we are not interested in.
+	-- We are only interested in the results that have a "type" equal to "match"
+	local matches = {}
+
+	for _, result in ipairs(cmd_lines) do
+		if result["type"] == "match" then
+			table.insert(matches, result)
+		end
+	end
+
+	-- Finally, we can return the appropriate data
+	--- @type SearchOutput[]
+	local search_output = {}
+
+	for _, match in ipairs(matches) do
+		local file_path = match["data"]["path"]["text"]
+		local lines = match["data"]["lines"]["text"]
+		local line_number = match["data"]["line_number"]
+		local raw_submatches = match["data"]["submatches"]
+		-- print(vim.inspect(search_output))
+
+		--- @type Submatch[]
+		local submatches = {}
+		for _, submatch in ipairs(raw_submatches) do
+			table.insert(submatches, {
+				match = submatch["match"]["text"],
+				start = submatch["start"] + 1,
+				finish = submatch["end"] + 1,
+			})
+		end
+
+		table.insert(search_output, {
+			file_path = file_path,
+			lines = lines,
+			line_number = line_number,
+			submatches = submatches,
+		})
+	end
+
+	return { data = search_output, error = nil }
+end
+
 return M

@@ -1,4 +1,6 @@
 local ui = require("usearch.ui")
+local process = require("usearch.process")
+local search = require("usearch.search")
 
 local M = {}
 
@@ -63,6 +65,18 @@ end
 
 function M.toggle_search()
 	ui.drawUI("toggle")
+end
+
+function M.stuff()
+	local so = search.search_with_json("g")
+	if so.error ~= nil then
+		print("Error")
+		print(vim.inspect(so.error))
+		return
+	end
+	print("Ok!")
+
+	process.process_search_output("g", "Bar", so.data)
 end
 
 return M

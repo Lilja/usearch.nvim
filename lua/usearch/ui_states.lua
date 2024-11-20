@@ -30,6 +30,16 @@ function M.display_matches()
 	return lines
 end
 
+--- @param processed_search_output ProcessedSearchOutput[]
+function M.display_matches_v2(processed_search_output)
+	local lines = {}
+	for _, output in ipairs(processed_search_output) do
+		table.insert(lines, output["line"])
+		table.insert(lines, "")
+	end
+	return lines
+end
+
 
 function M.display_error()
 	local error = state.error

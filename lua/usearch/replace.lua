@@ -6,13 +6,10 @@ local M = {}
 function M.open_file_and_change_it(file_path, changes)
 	local buf = vim.fn.bufadd(file_path)
 	vim.fn.bufload(buf)
-	-- Open the file, read the contents into the buffer
-	local file = io.open(file_path, "r")
 
 	for line_no, new_content in pairs(changes) do
-		print("Changing line " .. line_no .. " to " .. new_content)
 		-- Add +1 to the line number as lua is 1 indexed, these line numbers from rg are 0 indexed
-		vim.api.nvim_buf_set_lines(buf, line_no+1, line_no+1, false, { new_content })
+		vim.api.nvim_buf_set_lines(buf, line_no + 1, line_no + 1, false, { new_content })
 	end
 
 	-- Save the buffer
@@ -74,6 +71,34 @@ function M.perform_replace_on_file_path(file_path, line_numbers, search, replace
 	end
 
 	return { data = changes, error = nil }
+end
+
+--- Perform a search and replace on contents from stdin
+--- @param contents string
+--- @param search string
+--- @param replacer string
+function M.replace_in_line(contents, search, replacer)
+	local sed_command = "echo '" .. contents .. "' | sed -E 's#" .. search .. "#" .. replacer .. "#g'; echo $?"
+
+	local handle = io.popen(sed_command)
+	if handle == nil then
+		return { data = nil, error = { "Failed to execute command", sed_command } }
+	end
+	local lines = {}
+	local last_line = nil
+	for line in handle:lines() do
+		table.insert(lines, line)
+		last_line = line
+	end
+	handle:close()
+
+	local result = lines[1]
+
+	if tonumber(last_line) ~= 0 then
+		return { data = nil, error = { "Failed to execute command", result, sed_command } }
+	end
+
+	return { data = result, error = nil }
 end
 
 return M

@@ -288,6 +288,16 @@ function M.render_output_state(data_to_render)
 	end
 end
 
+function M.preview_search_results()
+	local so = search.search_with_json(state.regex)
+	if so.error ~= nil then
+		print(vim.inspect(so.error))
+		error("Error")
+	end
+
+	return process.process_search_output(state.regex, state.replacer, so.data)
+end
+
 function M.reduce_output_state()
 	if state.initial then
 		return M.render_output_state(ui_states.initial_state())
@@ -304,7 +314,8 @@ function M.reduce_output_state()
 	end
 
 	if state.last_matches ~= nil then
-		return M.render_output_state(ui_states.display_matches())
+		local so = M.preview_search_results()
+		return M.render_output_state(ui_states.display_matches_v2(so))
 	end
 end
 
