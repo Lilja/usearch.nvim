@@ -31,15 +31,35 @@ function M.display_matches()
 end
 
 --- @param processed_search_output ProcessedSearchOutput[]
+--- @return { lines: string[], callback: function }
 function M.display_matches_v2(processed_search_output)
+	local ns = vim.api.nvim_create_namespace("usearch")
+	local outputBuf = state.outputBuf
 	local lines = {}
-	for _, output in ipairs(processed_search_output) do
-		table.insert(lines, output["line"])
-		table.insert(lines, "")
-	end
-	return lines
-end
 
+	--- @type Offset[][]
+	local search_offsets = {}
+
+	local highlight_callback = function()
+		for line, offsets in ipairs(search_offsets) do
+			for _, offset in ipairs(offsets) do
+				print("Highlighting search", line - 1, offset["start"], offset["end"], outputBuf)
+				vim.api.nvim_buf_add_highlight(outputBuf, ns, "IncSearch", line - 1, offset["start"], offset["end"])
+			end
+		end
+	end
+	print("Displaying matches v2")
+	-- print(vim.inspect(processed_search_output))
+	for _, output in ipairs(processed_search_output) do
+		local _search_offsets = output["search_offset"]
+		table.insert(lines, output["line"])
+		table.insert(search_offsets, _search_offsets)
+	end
+	return {
+		lines = lines,
+		callback = highlight_callback,
+	}
+end
 
 function M.display_error()
 	local error = state.error

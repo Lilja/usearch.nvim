@@ -281,10 +281,14 @@ function M.switch_to_window(win)
 end
 
 --- @param data_to_render string[]
-function M.render_output_state(data_to_render)
+--- @param highlight_callback nil | fun(): nil
+function M.render_output_state(data_to_render, highlight_callback)
 	local outputBuf = state.outputBuf
 	if outputBuf ~= -1 then
 		vim.api.nvim_buf_set_lines(outputBuf, 0, -1, false, data_to_render)
+	end
+	if highlight_callback ~= nil then
+		highlight_callback()
 	end
 end
 
@@ -300,22 +304,23 @@ end
 
 function M.reduce_output_state()
 	if state.initial then
-		return M.render_output_state(ui_states.initial_state())
+		return M.render_output_state(ui_states.initial_state(), nil)
 	end
 
 	if state.error ~= nil then
 		print(vim.inspect(state.error))
-		return M.render_output_state(ui_states.display_error())
+		return M.render_output_state(ui_states.display_error(), nil)
 	end
 
 	if state.regex == nil or state.last_matches.matches_count == 0 then
 		local s = ui_states.empty_state()
-		return M.render_output_state(s)
+		return M.render_output_state(s, nil)
 	end
 
 	if state.last_matches ~= nil then
 		local so = M.preview_search_results()
-		return M.render_output_state(ui_states.display_matches_v2(so))
+		local result = ui_states.display_matches_v2(so)
+		return M.render_output_state(result.lines, result.callback)
 	end
 end
 

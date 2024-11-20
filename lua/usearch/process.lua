@@ -55,6 +55,10 @@ function M.process_search_output(search, replacer, search_output)
 		print(vim.inspect(output))
 
 		local new_lines = line
+		-- If there is a trailing newline, remove it
+		if new_lines:sub(-1) == "\n" then
+			new_lines = new_lines:sub(1, -2)
+		end
 
 		--- @type Offset[]
 		local search_offsets = {}
@@ -62,43 +66,54 @@ function M.process_search_output(search, replacer, search_output)
 		--- @type Offset[]
 		local replace_offsets = {}
 
-		local offset = 0
-		for _, match in ipairs(output.submatches) do
-			local start = match.start
-			local finish = match.finish
-			local content = match.match
-
-			local new_line_result = replace.replace_in_line(content, search, replacer)
-			if new_line_result.error ~= nil then
-				error("Error")
+		if replacer == nil or replacer == "" then
+			for _, match in ipairs(output.submatches) do
+				local start = match.start
+				local finish = match.finish
+				table.insert(search_offsets, {
+					["start"] = start - 1,
+					["end"] = finish - 1,
+				})
 			end
-			--- @type string
-			local new_content = new_line_result.data
-			local new_content_length = string.len(new_content)
+		else
+			local offset = 0
+			for _, match in ipairs(output.submatches) do
+				local start = match.start
+				local finish = match.finish
+				local content = match.match
 
-			local new_str = content .. new_content
-			local just_before_beginning_of_match = start + offset - 1
-			local prev_str = new_lines:sub(1, just_before_beginning_of_match)
-			local rest_of_str = new_lines:sub(finish + offset)
-			local concatted = prev_str .. new_str .. rest_of_str
-			new_lines = concatted
+				local new_line_result = replace.replace_in_line(content, search, replacer)
+				if new_line_result.error ~= nil then
+					error("Error")
+				end
+				--- @type string
+				local new_content = new_line_result.data
+				local new_content_length = string.len(new_content)
 
-			local search_offset_adjusted_start = start + offset
-			local search_offset_adjusted_end = finish + offset
+				local new_str = content .. new_content
+				local just_before_beginning_of_match = start + offset - 1
+				local prev_str = new_lines:sub(1, just_before_beginning_of_match)
+				local rest_of_str = new_lines:sub(finish + offset)
+				local concatted = prev_str .. new_str .. rest_of_str
+				new_lines = concatted
 
-			local replace_offset_adjusted_start = search_offset_adjusted_end
-			local replace_offset_adjusted_end = replace_offset_adjusted_start + new_content_length
+				local search_offset_adjusted_start = start + offset
+				local search_offset_adjusted_end = finish + offset
 
-			table.insert(search_offsets, {
-				["start"] = search_offset_adjusted_start - 1,
-				["end"] = search_offset_adjusted_end - 1,
-			})
-			table.insert(replace_offsets, {
-				["start"] = replace_offset_adjusted_start - 1,
-				["end"] = replace_offset_adjusted_end - 1,
-			})
+				local replace_offset_adjusted_start = search_offset_adjusted_end
+				local replace_offset_adjusted_end = replace_offset_adjusted_start + new_content_length
 
-			offset = offset + new_content_length
+				table.insert(search_offsets, {
+					["start"] = search_offset_adjusted_start - 1,
+					["end"] = search_offset_adjusted_end - 1,
+				})
+				table.insert(replace_offsets, {
+					["start"] = replace_offset_adjusted_start - 1,
+					["end"] = replace_offset_adjusted_end - 1,
+				})
+
+				offset = offset + new_content_length
+			end
 		end
 
 		table.insert(changes, {

@@ -88,7 +88,7 @@ end
 --- @return { data: SearchOutput[] | nil, error: string | string[] | nil }
 function M.search_with_json(search)
 	-- Perform a search with ripgrep using --json flag. This will return a more detailed output that we are able to later highlight in neovim.
-	local cmd = "rg --json " .. "'" .. search .. "' " .. " 2>&1; echo $?"
+	local cmd = "rg --json " .. "'" .. search .. "' test/references.txt" .. " 2>&1; echo $?"
 	print("Executing command", cmd)
 	local handle = io.popen(cmd)
 	if handle == nil then
