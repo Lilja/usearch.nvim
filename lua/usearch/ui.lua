@@ -103,34 +103,39 @@ function render_search_results(results)
 end
 
 function perform_search()
-	if state.regex == nil or state.regex == "" then
+	if state.search_regex == nil or state.search_regex == "" then
 		return
 	end
-	local matchesResult = search.search(state.regex, state.ignore)
+	local matchesResult = search.search_with_json(state.search_regex, state.ignore)
 	if matchesResult.error ~= nil then
 		state.error = matchesResult.error
 		M.reduce_output_state()
 		return
 	end
 	local matches = matchesResult.data
-	state.last_matches = process.group_up_matches_and_craft_meta_data(matches)
+	if matches == nil then
+		state.error = { "Failed to search" }
+		M.reduce_output_state()
+		return
+	end
+	state.grouped_search_outputs = process.group_up_search_outputs_by_filename(matches)
 
 	M.reduce_output_state()
 end
 
 function M.perform_replace()
-	if state.regex == nil or state.regex == "" then
+	if state.search_regex == nil or state.search_regex == "" then
 		return
 	end
 
-	if state.replacer ~= nil then
+	if state.replace_regex ~= nil then
 		for file_path, result in pairs(state.last_matches.grouped_matches) do
 			-- Flatten out the results to a number[]
 			local line_numbers = {}
 			for _, line_no in pairs(result.matches) do
 				table.insert(line_numbers, line_no)
 			end
-			local replaceResult = replace.perform_replace_on_file_path(file_path, line_numbers, state.regex, state.replacer)
+			local replaceResult = replace.perform_replace_on_file_path(file_path, line_numbers, state.search_regex, state.replace_regex)
 			if replaceResult.error ~= nil then
 				state.error = replaceResult.error
 				M.reduce_output_state()
@@ -172,13 +177,13 @@ function M.drawUI(mode)
 	M.listen_for_mode_change_in_buf(searchBuf, outputBuf, function(contents)
 		local regex = contents[1]
 		state.initial = false
-		state.regex = regex
+		state.search_regex = regex
 		state.error = nil
 		perform_search()
 	end)
 	M.listen_for_mode_change_in_buf(replaceBuf, outputBuf, function(contents)
 		state.initial = false
-		state.replacer = contents[1]
+		state.replace_regex = contents[1]
 		state.error = nil
 		perform_search()
 	end)
@@ -276,11 +281,11 @@ function M.drawUI(mode)
 	M.bind_escape_to_all_buffers()
 
 	if mode == "toggle" then
-		if state.regex ~= nil then
-			vim.api.nvim_buf_set_lines(searchBuf, 0, -1, false, { state.regex })
+		if state.search_regex ~= nil then
+			vim.api.nvim_buf_set_lines(searchBuf, 0, -1, false, { state.search_regex })
 		end
-		if state.replacer ~= nil then
-			vim.api.nvim_buf_set_lines(replaceBuf, 0, -1, false, { state.replacer })
+		if state.replace_regex ~= nil then
+			vim.api.nvim_buf_set_lines(replaceBuf, 0, -1, false, { state.replace_regex })
 		end
 		if state.ignore ~= nil then
 			vim.api.nvim_buf_set_lines(ignoreBuf, 0, -1, false, { state.ignore })
@@ -299,7 +304,6 @@ function M.drawUI(mode)
 		"outputBuf: " .. outputBuf,
 		"ignoreBuf: " .. ignoreBuf,
 		"debugBuf: " .. debugBuf,
-
 	})
 
 	-- Focus the search window
@@ -335,13 +339,13 @@ function M.render_output_state(data_to_render, highlight_callback)
 end
 
 function M.preview_search_results()
-	local so = search.search_with_json(state.regex, state.ignore)
+	local so = search.search_with_json(state.search_regex, state.ignore)
 	if so.error ~= nil then
 		print(vim.inspect(so.error))
 		error("Error")
 	end
 
-	local pso = process.process_search_output(state.regex, state.replacer, so.data)
+	local pso = process.process_search_output(state.search_regex, state.replace_regex, so.data)
 	return process.group_up_search_outputs_by_filename(pso)
 end
 
@@ -354,12 +358,12 @@ function M.reduce_output_state()
 		return M.render_output_state(ui_states.display_error(), nil)
 	end
 
-	if state.regex == nil or state.last_matches.matches_count == 0 then
+	if state.search_regex == nil or #state.grouped_search_outputs == 0 then
 		local s = ui_states.empty_state()
 		return M.render_output_state(s, nil)
 	end
 
-	if state.last_matches ~= nil then
+	if state.grouped_search_outputs ~= nil then
 		local grouped_up_results = M.preview_search_results()
 		local result = ui_states.display_matches_v2(grouped_up_results)
 		return M.render_output_state(result.lines, result.callback)
