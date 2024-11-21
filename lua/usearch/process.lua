@@ -41,8 +41,50 @@ function M.group_up_matches_and_craft_meta_data(matches)
 	}
 end
 
+--- @alias LineSearchOutput { line_number: number, lines: string, search_offset: Offset[], replace_offset: Offset[] | nil }
+--- @alias GroupedSearchOutput { file_path: string, line_search_outputs: LineSearchOutput[] }
+--- @param process_search_output ProcessedSearchOutput[]
+--- @return GroupedSearchOutput[]
+function M.group_up_search_outputs_by_filename(process_search_output)
+
+	--- @type { [string]: LineSearchOutput[] }
+	local grouped_search_outputs = {}
+
+	for _, output in ipairs(process_search_output) do
+		local file_path = output["file_path"]
+		if grouped_search_outputs[file_path] == nil then
+			grouped_search_outputs[file_path] = {}
+		end
+
+		local line_number = output["line_number"]
+		local lines = output["line"]
+		local search_offset = output["search_offset"]
+		local replace_offset = output["replace_offset"]
+
+		local line_search_output = {
+			["line_number"] = line_number,
+			["lines"] = lines,
+			["search_offset"] = search_offset,
+			["replace_offset"] = replace_offset,
+		}
+		table.insert(grouped_search_outputs[file_path], line_search_output)
+	end
+
+	--- @type GroupedSearchOutput[]
+	local grouped_search_outputs_final = {}
+
+	for file_path, line_search_outputs in pairs(grouped_search_outputs) do
+		table.insert(grouped_search_outputs_final, {
+			["file_path"] = file_path,
+			["line_search_outputs"] = line_search_outputs,
+		})
+	end
+
+	return grouped_search_outputs_final
+end
+
 --- @alias Offset { start: number, end: number }
---- @alias ProcessedSearchOutput { line: string, search_offset: Offset[], replace_offset: Offset[] }
+--- @alias ProcessedSearchOutput { line: string, search_offset: Offset[], replace_offset: Offset[] | nil, file_path: string, line_number: number }
 --- @param search string
 --- @param replacer string
 --- @param search_output SearchOutput[]
@@ -52,7 +94,6 @@ function M.process_search_output(search, replacer, search_output)
 
 	for _, output in ipairs(search_output) do
 		local line = output["lines"]
-		print(vim.inspect(output))
 
 		local new_lines = line
 		-- If there is a trailing newline, remove it
@@ -63,7 +104,7 @@ function M.process_search_output(search, replacer, search_output)
 		--- @type Offset[]
 		local search_offsets = {}
 		---
-		--- @type Offset[]
+		--- @type Offset[] | nil
 		local replace_offsets = {}
 
 		if replacer == nil or replacer == "" then
@@ -74,6 +115,7 @@ function M.process_search_output(search, replacer, search_output)
 					["start"] = start - 1,
 					["end"] = finish - 1,
 				})
+				replace_offsets = nil
 			end
 		else
 			local offset = 0
@@ -107,6 +149,9 @@ function M.process_search_output(search, replacer, search_output)
 					["start"] = search_offset_adjusted_start - 1,
 					["end"] = search_offset_adjusted_end - 1,
 				})
+				if replace_offsets == nil then
+					error("Replace offsets should not be nil")
+				end
 				table.insert(replace_offsets, {
 					["start"] = replace_offset_adjusted_start - 1,
 					["end"] = replace_offset_adjusted_end - 1,
@@ -118,6 +163,8 @@ function M.process_search_output(search, replacer, search_output)
 
 		table.insert(changes, {
 			line = new_lines,
+			file_path = output["file_path"],
+			line_number = output["line_number"],
 			search_offset = search_offsets,
 			replace_offset = replace_offsets,
 		})

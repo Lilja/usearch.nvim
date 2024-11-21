@@ -13,20 +13,14 @@ function M.detectModifiedFiles(file_paths)
 	for _, buf in ipairs(bufs) do
 		local path = vim.api.nvim_buf_get_name(buf)
 		if path ~= "" then
-			print("Path " .. path)
 			local modified = vim.api.nvim_get_option_value("modified", { buf = buf })
 			if modified then
-				print("Insert " .. path)
 				table.insert(openBufs, path)
 			end
 		end
 	end
 	--- @type { [string]: "OK" | "OPEN_AND_MODIFIED" }
 	local file_path_checks = {}
-	-- print("------------")
-	-- print(vim.inspect(file_paths))
-	-- print(vim.inspect(openBufs))
-	-- print("------------")
 	for file_path_to_change, _ in pairs(file_paths) do
 		for _, open_file_that_is_modified in ipairs(openBufs) do
 			if file_path_to_change == open_file_that_is_modified then
@@ -38,7 +32,6 @@ function M.detectModifiedFiles(file_paths)
 			file_path_checks[file_path_to_change] = "OK"
 		end
 	end
-	-- print(vim.inspect(file_paths))
 	return file_path_checks
 end
 
@@ -70,11 +63,10 @@ end
 function M.stuff()
 	local so = search.search_with_json("g")
 	if so.error ~= nil then
-		print("Error")
 		print(vim.inspect(so.error))
+		error("Error")
 		return
 	end
-	print("Ok!")
 
 	process.process_search_output("g", "Bar", so.data)
 end

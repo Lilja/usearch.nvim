@@ -30,9 +30,9 @@ function M.display_matches()
 	return lines
 end
 
---- @param processed_search_output ProcessedSearchOutput[]
+--- @param grouped_search_outputs GroupedSearchOutput[]
 --- @return { lines: string[], callback: function }
-function M.display_matches_v2(processed_search_output)
+function M.display_matches_v2(grouped_search_outputs)
 	local ns = vim.api.nvim_create_namespace("usearch")
 	local outputBuf = state.outputBuf
 	local lines = {}
@@ -40,20 +40,39 @@ function M.display_matches_v2(processed_search_output)
 	--- @type Offset[][]
 	local search_offsets = {}
 
+	--- @type Offset[][] | nil
+	local replace_offsets = nil
+
 	local highlight_callback = function()
 		for line, offsets in ipairs(search_offsets) do
 			for _, offset in ipairs(offsets) do
-				print("Highlighting search", line - 1, offset["start"], offset["end"], outputBuf)
 				vim.api.nvim_buf_add_highlight(outputBuf, ns, "IncSearch", line - 1, offset["start"], offset["end"])
+			end
+			if replace_offsets ~= nil then
+				local replace_offset = replace_offsets[line]
+
+				for _, offset in ipairs(replace_offset) do
+					vim.api.nvim_buf_add_highlight(outputBuf, ns, "CurSearch", line - 1, offset["start"], offset["end"])
+				end
 			end
 		end
 	end
-	print("Displaying matches v2")
-	-- print(vim.inspect(processed_search_output))
-	for _, output in ipairs(processed_search_output) do
-		local _search_offsets = output["search_offset"]
-		table.insert(lines, output["line"])
-		table.insert(search_offsets, _search_offsets)
+	for _, output in ipairs(grouped_search_outputs) do
+		-- TODO: insert file path as a heading or something
+		for it, line_output in ipairs(output["line_search_outputs"]) do
+			local line = line_output.lines
+			table.insert(lines, line)
+			table.insert(search_offsets, line_output.search_offset)
+			if line_output.replace_offset ~= nil then
+				if replace_offsets == nil then
+					replace_offsets = {}
+				end
+				table.insert(replace_offsets, line_output.replace_offset)
+			end
+		end
+		-- local _search_offsets = output["search_offset"]
+		-- table.insert(lines, output["line"])
+		-- table.insert(search_offsets, _search_offsets)
 	end
 	return {
 		lines = lines,

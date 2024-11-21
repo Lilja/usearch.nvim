@@ -299,7 +299,8 @@ function M.preview_search_results()
 		error("Error")
 	end
 
-	return process.process_search_output(state.regex, state.replacer, so.data)
+	local pso = process.process_search_output(state.regex, state.replacer, so.data)
+	return process.group_up_search_outputs_by_filename(pso)
 end
 
 function M.reduce_output_state()
@@ -308,7 +309,6 @@ function M.reduce_output_state()
 	end
 
 	if state.error ~= nil then
-		print(vim.inspect(state.error))
 		return M.render_output_state(ui_states.display_error(), nil)
 	end
 
@@ -318,8 +318,8 @@ function M.reduce_output_state()
 	end
 
 	if state.last_matches ~= nil then
-		local so = M.preview_search_results()
-		local result = ui_states.display_matches_v2(so)
+		local grouped_up_results = M.preview_search_results()
+		local result = ui_states.display_matches_v2(grouped_up_results)
 		return M.render_output_state(result.lines, result.callback)
 	end
 end

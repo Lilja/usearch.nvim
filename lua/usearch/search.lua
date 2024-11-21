@@ -33,7 +33,8 @@ function M.search(regex, ignore)
 	-- We need to remove the last line
 	local result = table.concat(lines, "\n")
 
-	if tonumber(last_line) ~= 0 then
+	-- According to ripgrep documentation, the exit code is 0 if there are matches, 1 if there are no matches, and 2 if there is an error
+	if tonumber(last_line) == 2 then
 		return { data = {}, error = { "Failed to execute command", unpack(lines), cmd } }
 	end
 
@@ -89,7 +90,6 @@ end
 function M.search_with_json(search)
 	-- Perform a search with ripgrep using --json flag. This will return a more detailed output that we are able to later highlight in neovim.
 	local cmd = "rg --json " .. "'" .. search .. "' test/references.txt" .. " 2>&1; echo $?"
-	print("Executing command", cmd)
 	local handle = io.popen(cmd)
 	if handle == nil then
 		return { data = {}, error = { "Failed to execute command", cmd } }
@@ -106,7 +106,7 @@ function M.search_with_json(search)
 	end
 	handle:close()
 
-	if tonumber(last_line) ~= 0 then
+	if tonumber(last_line) == 2 then
 		return { data = nil, error = { "Failed to execute command", unpack(cmd_lines), cmd } }
 	end
 
@@ -129,7 +129,6 @@ function M.search_with_json(search)
 		local lines = match["data"]["lines"]["text"]
 		local line_number = match["data"]["line_number"]
 		local raw_submatches = match["data"]["submatches"]
-		-- print(vim.inspect(search_output))
 
 		--- @type Submatch[]
 		local submatches = {}
