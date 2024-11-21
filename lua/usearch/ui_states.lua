@@ -2,6 +2,7 @@ local state = require("usearch.state")
 local devicon = require("nvim-web-devicons")
 
 local M = {}
+--- @alias HighlightInstruction { buffer_line_number: number, highlight_group: string, offsets: Offset[]}
 
 function M.empty_state()
 	return {
@@ -31,7 +32,6 @@ function M.display_matches()
 	return lines
 end
 
-
 --- @param offset Offset[]
 --- @param diff number
 function change_offset(offset, diff)
@@ -46,6 +46,68 @@ function change_offset(offset, diff)
 	return new_offset
 end
 
+--- @param file_path string
+--- @param lines string[]
+--- @param highlight_content HighlightInstruction[]
+--- @return { line: string, highlight: HighlightInstruction }
+function render_file_path(file_path, lines, highlight_content)
+	local filename = file_path:match("([^/]+)$")
+	local file_extension = filename:match("^.+%.(.+)$")
+	local icon = devicon.get_icon(filename, file_extension, { default = true })
+	local highlight = {
+		buffer_line_number = 0,
+		highlight_group = state.config.file_path_highlight_group,
+		offsets = {
+			{
+				start = 0,
+				finish = #file_path,
+			},
+		},
+	}
+	local line = icon .. " " .. file_path
+	table.insert(lines, line)
+	table.insert(highlight_content, highlight)
+end
+
+--- @param buffer_line_number number
+--- @param line_output LineSearchOutput
+--- @param highlight_content HighlightInstruction[]
+function render_search_and_replace_content(buffer_line_number, line_output, highlight_content)
+	local search_offsets = line_output.search_offset
+	local replace_offsets = line_output.replace_offset
+	search_offsets = change_offset(search_offsets, #tostring(line_output.line_number) + 1)
+	if replace_offsets ~= nil then
+		replace_offsets = change_offset(replace_offsets, #tostring(line_output.line_number) + 1)
+	end
+	-- Insert formatting for the line number. Use the LineNr highlight group.
+	table.insert(highlight_content, {
+		buffer_line_number = buffer_line_number,
+		highlight_group = state.config.line_number_highlight_group,
+		offsets = {
+			{
+				start = 0,
+				finish = #tostring(line_output.line_number),
+			},
+		},
+	})
+
+	table.insert(highlight_content, {
+		buffer_line_number = buffer_line_number,
+		highlight_group = state.config.search_highlight_group,
+		offsets = search_offsets,
+	})
+	if line_output.replace_offset ~= nil then
+		if replace_offsets == nil then
+			replace_offsets = {}
+		end
+		table.insert(highlight_content, {
+			buffer_line_number = buffer_line_number,
+			highlight_group = state.config.replace_highlight_group,
+			offsets = replace_offsets,
+		})
+	end
+end
+
 --- @param grouped_search_outputs GroupedSearchOutput[]
 --- @return { lines: string[], callback: function }
 function M.display_matches_v2(grouped_search_outputs)
@@ -55,10 +117,13 @@ function M.display_matches_v2(grouped_search_outputs)
 
 	-- A table to store what to highlight in the buffer. The key is the buffer line number(0-indexed).
 	---
-	--- @type { buffer_line_number: number, highlight_group: string, offsets: Offset[]}[]
+	--- @type HighlightInstruction[]
 	local highlight_content = {}
 
 	local highlight_callback = function()
+		-- We have just put all the lines in the buffer. Now we need to highlight them.
+		-- Previously, we saved instructions for highlighting in the highlight_content table.
+		-- Now we will use those instructions to highlight the buffer.
 		for _, content in ipairs(highlight_content) do
 			local buffer_line_number = content["buffer_line_number"]
 
@@ -79,22 +144,8 @@ function M.display_matches_v2(grouped_search_outputs)
 	local buffer_line_number = 0
 	for it, output in ipairs(grouped_search_outputs) do
 		-- file path contains slash, so we need to split it.
-		local filename = output["file_path"]:match("([^/]+)$")
-		local file_extension = filename:match("^.+%.(.+)$")
-		local icon = devicon.get_icon(filename, file_extension, { default = true })
-		local file_name_row = icon .. " " .. output["file_path"]
-		table.insert(lines, file_name_row)
-		-- Insert formatting for the file path. Use the Title highlight group.
-		table.insert(highlight_content, {
-			buffer_line_number = buffer_line_number,
-			highlight_group = state.config.file_path_highlight_group,
-			offsets = {
-				{
-					start = 0,
-					finish = #file_name_row,
-				},
-			},
-		})
+		local file_path = output["file_path"]
+		render_file_path(file_path, lines, highlight_content)
 		buffer_line_number = buffer_line_number + 1
 
 		for _, line_output in ipairs(output["line_search_outputs"]) do
@@ -102,40 +153,7 @@ function M.display_matches_v2(grouped_search_outputs)
 			-- Prepend the line number before the line with a space. Then adjust the offsets.
 			line = line_output.line_number .. " " .. line
 			table.insert(lines, line)
-			local search_offsets = line_output.search_offset
-			local replace_offsets = line_output.replace_offset
-			search_offsets = change_offset(search_offsets, #tostring(line_output.line_number) + 1)
-			if replace_offsets ~= nil then
-				replace_offsets = change_offset(replace_offsets, #tostring(line_output.line_number) + 1)
-			end
-			-- Insert formatting for the line number. Use the LineNr highlight group.
-			table.insert(highlight_content, {
-				buffer_line_number = buffer_line_number,
-				highlight_group = state.config.line_number_highlight_group,
-				offsets = {
-					{
-						start = 0,
-						finish = #tostring(line_output.line_number),
-					},
-				},
-			})
-
-			-- table.insert(search_offsets[buffer_line_number], line_output.search_offset)
-			table.insert(highlight_content, {
-				buffer_line_number = buffer_line_number,
-				highlight_group = state.config.search_highlight_group,
-				offsets = search_offsets,
-			})
-			if line_output.replace_offset ~= nil then
-				if replace_offsets == nil then
-					replace_offsets = {}
-				end
-				table.insert(highlight_content, {
-					buffer_line_number = buffer_line_number,
-					highlight_group = state.config.replace_highlight_group,
-					offsets = replace_offsets,
-				})
-			end
+			render_search_and_replace_content(buffer_line_number, line_output, highlight_content)
 			buffer_line_number = buffer_line_number + 1
 		end
 

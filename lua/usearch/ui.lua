@@ -128,6 +128,8 @@ function M.perform_replace()
 		return
 	end
 
+	local changed_files_with_seq_cur = {}
+
 	if state.replace_regex ~= nil then
 		for _, result in pairs(state.matches) do
 			local file_path = result["file_path"]
@@ -146,8 +148,10 @@ function M.perform_replace()
 				return
 			end
 			replace.open_file_and_change_it(file_path, data)
+			table.insert(changed_files_with_seq_cur, { file_path = file_path, seq_cur = data })
 		end
 	end
+	state.changed_files_with_seq_cur = changed_files_with_seq_cur
 end
 
 --- @param mode "new" | "toggle"

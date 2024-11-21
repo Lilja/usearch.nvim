@@ -3,6 +3,7 @@ local M = {}
 --- Changes the contents of a file_path. The changes are a list of line numbers and the new content to replace the line with.
 --- @param file_path string
 --- @param changes { [number]: string }
+--- @return number
 function M.open_file_and_change_it(file_path, changes)
 	local buf = vim.fn.bufadd(file_path)
 	vim.fn.bufload(buf)
@@ -12,13 +13,18 @@ function M.open_file_and_change_it(file_path, changes)
 		vim.api.nvim_buf_set_lines(buf, line_no + 1, line_no + 1, false, { new_content })
 	end
 
+	local undo_seq_cur = -1
+
 	-- Save the buffer
 	vim.api.nvim_buf_call(buf, function()
 		vim.cmd("write")
+		-- Save the undo number
+		undo_seq_cur = vim.fn.undotree(buf).seq_cur
 	end)
 
 	-- Close the buffer
 	vim.api.nvim_buf_delete(buf, { force = true })
+	return undo_seq_cur
 end
 
 --- Perform a search and replace on a file_path. The changes are a list of line numbers and the new content to replace the line with.

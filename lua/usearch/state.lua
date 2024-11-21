@@ -20,6 +20,10 @@ local error = nil
 --- @type FileMatch[]
 local matches = {}
 
+-- A table to store the current undo state of the files that was search and replaced.
+--- @type { file_path: string, seq_cur: number }[]
+local changed_files_with_seq_cur = {}
+
 local M = {
 	initial = true,
 
@@ -51,6 +55,8 @@ local M = {
 		line_number_highlight_group = "LineNr",
 		file_path_highlight_group = "Title",
 	},
+
+	changed_files_with_seq_cur = changed_files_with_seq_cur,
 }
 
 function M.reset_state()
@@ -76,6 +82,7 @@ function M.reset_state()
 
 	M.error = nil
 
+	M.changed_files_with_seq_cur = {}
 end
 
 return M
