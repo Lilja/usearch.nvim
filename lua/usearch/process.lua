@@ -46,7 +46,6 @@ end
 --- @param process_search_output ProcessedSearchOutput[]
 --- @return GroupedSearchOutput[]
 function M.group_up_search_outputs_by_filename(process_search_output)
-
 	--- @type { [string]: LineSearchOutput[] }
 	local grouped_search_outputs = {}
 
@@ -83,7 +82,7 @@ function M.group_up_search_outputs_by_filename(process_search_output)
 	return grouped_search_outputs_final
 end
 
---- @alias Offset { start: number, end: number }
+--- @alias Offset { start: number, finish: number }
 --- @alias ProcessedSearchOutput { line: string, search_offset: Offset[], replace_offset: Offset[] | nil, file_path: string, line_number: number }
 --- @param search string
 --- @param replacer string
@@ -111,9 +110,10 @@ function M.process_search_output(search, replacer, search_output)
 			for _, match in ipairs(output.submatches) do
 				local start = match.start
 				local finish = match.finish
+				-- The offsets from ripgrep are 0-based. We're about to do some string manipulation in lua, so we need to adjust the offsets to be 1-based
 				table.insert(search_offsets, {
 					["start"] = start - 1,
-					["end"] = finish - 1,
+					["finish"] = finish - 1,
 				})
 				replace_offsets = nil
 			end
@@ -145,16 +145,17 @@ function M.process_search_output(search, replacer, search_output)
 				local replace_offset_adjusted_start = search_offset_adjusted_end
 				local replace_offset_adjusted_end = replace_offset_adjusted_start + new_content_length
 
+				-- The offsets from ripgrep are 0-based. We're about to do some string manipulation in lua, so we need to adjust the offsets to be 1-based
 				table.insert(search_offsets, {
 					["start"] = search_offset_adjusted_start - 1,
-					["end"] = search_offset_adjusted_end - 1,
+					["finish"] = search_offset_adjusted_end - 1,
 				})
 				if replace_offsets == nil then
 					error("Replace offsets should not be nil")
 				end
 				table.insert(replace_offsets, {
 					["start"] = replace_offset_adjusted_start - 1,
-					["end"] = replace_offset_adjusted_end - 1,
+					["finish"] = replace_offset_adjusted_end - 1,
 				})
 
 				offset = offset + new_content_length

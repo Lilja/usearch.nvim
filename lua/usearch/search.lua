@@ -86,10 +86,18 @@ end
 --- @alias Submatch { match: string, start: number, finish: number }
 --- @alias SearchOutput { file_path: string, lines: string, line_number: number, submatches: Submatch[] }
 --- @param search string
+--- @param ignore string|nil
 --- @return { data: SearchOutput[] | nil, error: string | string[] | nil }
-function M.search_with_json(search)
+function M.search_with_json(search, ignore)
 	-- Perform a search with ripgrep using --json flag. This will return a more detailed output that we are able to later highlight in neovim.
-	local cmd = "rg --json " .. "'" .. search .. "' test/references.txt" .. " 2>&1; echo $?"
+	local rg_args = {
+		"--json",
+	}
+	local rg_flags = table.concat(rg_args, " ")
+	if ignore ~= nil and ignore ~= "" then
+		rg_flags = rg_flags .. " -g '!" .. ignore .. "'"
+	end
+	local cmd = "rg " .. rg_flags .. " '" .. search .. "' 2>&1; echo $?"
 	local handle = io.popen(cmd)
 	if handle == nil then
 		return { data = {}, error = { "Failed to execute command", cmd } }

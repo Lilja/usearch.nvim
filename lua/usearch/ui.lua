@@ -24,8 +24,8 @@ function M.listen_for_mode_change_in_buf(buf, outputBuf, callback)
 end
 
 --- @param buf number
---- @param next "search" | "replace" | "ignore" | "output"
---- @param prev "search" | "replace" | "ignore" | "output"
+--- @param next "search" | "replace" | "ignore" | "output" | "debug"
+--- @param prev "search" | "replace" | "ignore" | "output" | "debug"
 function M.bind_keybinds_to_buf(buf, next, prev)
 	local cmdNext = ":lua require('" .. state.pkg .. ".ui').switch_to_window('" .. next .. "')<CR>"
 	local cmdPrev = ":lua require('" .. state.pkg .. ".ui').switch_to_window('" .. prev .. "')<CR>"
@@ -59,6 +59,9 @@ function M.close_window()
 	if vim.api.nvim_win_is_valid(state.ignoreWin) then
 		vim.api.nvim_win_close(state.ignoreWin, true)
 	end
+	if vim.api.nvim_win_is_valid(state.debugWin) then
+		vim.api.nvim_win_close(state.debugWin, true)
+	end
 
 	if vim.api.nvim_buf_is_loaded(state.searchBuf) then
 		vim.api.nvim_buf_delete(state.searchBuf, { force = true })
@@ -71,6 +74,9 @@ function M.close_window()
 	end
 	if vim.api.nvim_buf_is_loaded(state.ignoreBuf) then
 		vim.api.nvim_buf_delete(state.ignoreBuf, { force = true })
+	end
+	if vim.api.nvim_buf_is_loaded(state.debugBuf) then
+		vim.api.nvim_buf_delete(state.debugBuf, { force = true })
 	end
 end
 
@@ -159,6 +165,10 @@ function M.drawUI(mode)
 	local outputBuf = vim.api.nvim_create_buf(false, false)
 	vim.api.nvim_buf_set_option(outputBuf, "buftype", "nofile")
 
+	-- Create debug buffer for the floating window
+	local debugBuf = vim.api.nvim_create_buf(false, false)
+	vim.api.nvim_buf_set_option(debugBuf, "buftype", "nofile")
+
 	M.listen_for_mode_change_in_buf(searchBuf, outputBuf, function(contents)
 		local regex = contents[1]
 		state.initial = false
@@ -217,6 +227,19 @@ function M.drawUI(mode)
 		title_pos = "center",
 	})
 
+	-- Create the debug buffer, it's located below the ignore buffer
+	local debugWin = vim.api.nvim_open_win(debugBuf, true, {
+		relative = "editor",
+		width = 40,
+		height = 9,
+		row = 10,
+		col = 10,
+		style = "minimal",
+		border = "rounded",
+		title = "Debug",
+		title_pos = "center",
+	})
+
 	-- Finally, create the floating window that will show the results of the search and replace
 	-- It's located to the right of both the search and replace buffers
 	local outputWin = vim.api.nvim_open_win(outputBuf, true, {
@@ -234,18 +257,21 @@ function M.drawUI(mode)
 	-- Bind keybinds to the buffers, you should navigate vertically and then switch to the output buffer, and back to the search buffer.
 	M.bind_keybinds_to_buf(searchBuf, "replace", "output")
 	M.bind_keybinds_to_buf(replaceBuf, "ignore", "search")
-	M.bind_keybinds_to_buf(ignoreBuf, "output", "replace")
-	M.bind_keybinds_to_buf(outputBuf, "search", "ignore")
+	M.bind_keybinds_to_buf(ignoreBuf, "debug", "replace")
+	M.bind_keybinds_to_buf(debugBuf, "output", "ignore")
+	M.bind_keybinds_to_buf(outputBuf, "search", "debug")
 
 	state.searchWin = searchWin
 	state.replaceWin = replaceWin
 	state.outputWin = outputWin
 	state.ignoreWin = ignoreWin
+	state.debugWin = debugWin
 
 	state.searchBuf = searchBuf
 	state.replaceBuf = replaceBuf
 	state.outputBuf = outputBuf
 	state.ignoreBuf = ignoreBuf
+	state.debugBuf = debugBuf
 
 	M.bind_escape_to_all_buffers()
 
@@ -262,6 +288,20 @@ function M.drawUI(mode)
 		perform_search()
 	end
 
+	M.debug_buf_print({
+		"searchWin: " .. searchWin,
+		"replaceWin: " .. replaceWin,
+		"outputWin: " .. outputWin,
+		"ignoreWin: " .. ignoreWin,
+		"debugWin: " .. debugWin,
+		"searchBuf: " .. searchBuf,
+		"replaceBuf: " .. replaceBuf,
+		"outputBuf: " .. outputBuf,
+		"ignoreBuf: " .. ignoreBuf,
+		"debugBuf: " .. debugBuf,
+
+	})
+
 	-- Focus the search window
 	vim.api.nvim_set_current_win(searchWin)
 	M.reduce_output_state()
@@ -277,6 +317,8 @@ function M.switch_to_window(win)
 		vim.api.nvim_set_current_win(state.ignoreWin)
 	elseif win == "output" then
 		vim.api.nvim_set_current_win(state.outputWin)
+	elseif win == "debug" then
+		vim.api.nvim_set_current_win(state.debugWin)
 	end
 end
 
@@ -293,7 +335,7 @@ function M.render_output_state(data_to_render, highlight_callback)
 end
 
 function M.preview_search_results()
-	local so = search.search_with_json(state.regex)
+	local so = search.search_with_json(state.regex, state.ignore)
 	if so.error ~= nil then
 		print(vim.inspect(so.error))
 		error("Error")
@@ -321,6 +363,14 @@ function M.reduce_output_state()
 		local grouped_up_results = M.preview_search_results()
 		local result = ui_states.display_matches_v2(grouped_up_results)
 		return M.render_output_state(result.lines, result.callback)
+	end
+end
+
+--- @param contents string[]
+function M.debug_buf_print(contents)
+	local debugBuf = state.debugBuf
+	if debugBuf ~= -1 then
+		vim.api.nvim_buf_set_lines(debugBuf, 0, -1, false, contents)
 	end
 end
 

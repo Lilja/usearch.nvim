@@ -1,4 +1,5 @@
 local state = require("usearch.state")
+local devicon = require("nvim-web-devicons")
 
 local M = {}
 
@@ -30,6 +31,21 @@ function M.display_matches()
 	return lines
 end
 
+
+--- @param offset Offset[]
+--- @param diff number
+function change_offset(offset, diff)
+	--- @type Offset[]
+	local new_offset = {}
+	for _, o in ipairs(offset) do
+		table.insert(new_offset, {
+			start = o.start + diff,
+			finish = o.finish + diff,
+		})
+	end
+	return new_offset
+end
+
 --- @param grouped_search_outputs GroupedSearchOutput[]
 --- @return { lines: string[], callback: function }
 function M.display_matches_v2(grouped_search_outputs)
@@ -37,38 +53,78 @@ function M.display_matches_v2(grouped_search_outputs)
 	local outputBuf = state.outputBuf
 	local lines = {}
 
-	--- @type Offset[][]
-	local search_offsets = {}
-
-	--- @type Offset[][] | nil
-	local replace_offsets = nil
+	-- A table to store what to highlight in the buffer. The key is the buffer line number(0-indexed).
+	---
+	--- @type { buffer_line_number: number, highlight_group: string, offsets: Offset[]}[]
+	local highlight_content = {}
 
 	local highlight_callback = function()
-		for line, offsets in ipairs(search_offsets) do
-			for _, offset in ipairs(offsets) do
-				vim.api.nvim_buf_add_highlight(outputBuf, ns, "IncSearch", line - 1, offset["start"], offset["end"])
-			end
-			if replace_offsets ~= nil then
-				local replace_offset = replace_offsets[line]
+		for _, content in ipairs(highlight_content) do
+			local buffer_line_number = content["buffer_line_number"]
 
-				for _, offset in ipairs(replace_offset) do
-					vim.api.nvim_buf_add_highlight(outputBuf, ns, "CurSearch", line - 1, offset["start"], offset["end"])
-				end
+			local offsets = content["offsets"]
+			for _, offset in ipairs(offsets) do
+				vim.api.nvim_buf_add_highlight(
+					outputBuf,
+					ns,
+					content["highlight_group"],
+					buffer_line_number,
+					offset["start"],
+					offset["finish"]
+				)
 			end
 		end
 	end
+
+	local buffer_line_number = 0
 	for _, output in ipairs(grouped_search_outputs) do
-		-- TODO: insert file path as a heading or something
-		for it, line_output in ipairs(output["line_search_outputs"]) do
+		-- file path contains slash, so we need to split it.
+		local filename = output["file_path"]:match("([^/]+)$")
+		local file_extension = filename:match("^.+%.(.+)$")
+		local icon = devicon.get_icon(filename, file_extension, { default = true })
+		table.insert(lines, icon .. " " .. output["file_path"])
+		buffer_line_number = buffer_line_number + 1
+
+		for _, line_output in ipairs(output["line_search_outputs"]) do
 			local line = line_output.lines
+			-- Prepend the line number before the line with a space. Then adjust the offsets.
+			line = line_output.line_number .. " " .. line
 			table.insert(lines, line)
-			table.insert(search_offsets, line_output.search_offset)
+			local search_offsets = line_output.search_offset
+			local replace_offsets = line_output.replace_offset
+			search_offsets = change_offset(search_offsets, #tostring(line_output.line_number) + 1)
+			if replace_offsets ~= nil then
+				replace_offsets = change_offset(replace_offsets, #tostring(line_output.line_number) + 1)
+			end
+			-- Insert formatting for the line number. Use the LineNr highlight group.
+			table.insert(highlight_content, {
+				buffer_line_number = buffer_line_number,
+				highlight_group = "LineNr",
+				offsets = {
+					{
+						start = 0,
+						finish = #tostring(line_output.line_number),
+					},
+				},
+			})
+
+			-- table.insert(search_offsets[buffer_line_number], line_output.search_offset)
+			table.insert(highlight_content, {
+				buffer_line_number = buffer_line_number,
+				highlight_group = "IncSearch",
+				offsets = search_offsets,
+			})
 			if line_output.replace_offset ~= nil then
 				if replace_offsets == nil then
 					replace_offsets = {}
 				end
-				table.insert(replace_offsets, line_output.replace_offset)
+				table.insert(highlight_content, {
+					buffer_line_number = buffer_line_number,
+					highlight_group = "CurSearch",
+					offsets = replace_offsets,
+				})
 			end
+			buffer_line_number = buffer_line_number + 1
 		end
 		-- local _search_offsets = output["search_offset"]
 		-- table.insert(lines, output["line"])
