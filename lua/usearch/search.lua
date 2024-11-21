@@ -4,7 +4,7 @@ local M = {}
 --- @alias SearchOutput { file_path: string, lines: string, line_number: number, submatches: Submatch[] }
 --- @param search string
 --- @param ignore string|nil
---- @return { data: SearchOutput[] | nil, error: string | string[] | nil }
+--- @return { data: {elapsed: string, output: SearchOutput[]} | nil, error: string | string[] | nil }
 function M.search_with_json(search, ignore)
 	-- Perform a search with ripgrep using --json flag. This will return a more detailed output that we are able to later highlight in neovim.
 	local rg_args = {
@@ -38,10 +38,14 @@ function M.search_with_json(search, ignore)
 	-- Now we need to filter out the certain results we are not interested in.
 	-- We are only interested in the results that have a "type" equal to "match"
 	local matches = {}
+	local elapsed = 0
 
 	for _, result in ipairs(cmd_lines) do
 		if result["type"] == "match" then
 			table.insert(matches, result)
+		end
+		if result["type"] == "summary" then
+			elapsed = result["data"]["elapsed_total"]["human"]
 		end
 	end
 
@@ -73,7 +77,12 @@ function M.search_with_json(search, ignore)
 		})
 	end
 
-	return { data = search_output, error = nil }
+	local data = {
+		elapsed = elapsed,
+		output = search_output,
+	}
+
+	return { data = data, error = nil }
 end
 
 return M

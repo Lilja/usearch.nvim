@@ -18,20 +18,7 @@ function M.initial_state()
 		"Begin by entering a search term in the search buffer.",
 	}
 end
-
-function M.display_matches()
-	local matches = state.last_matches
-	local lines = {}
-	table.insert(lines, "Matches found: " .. matches["matches_count"])
-	table.insert(lines, "")
-	for file_path, group in pairs(matches["grouped_matches"]) do
-		table.insert(lines, "File: " .. file_path)
-		table.insert(lines, "Matches: " .. group["count"])
-		table.insert(lines, "")
-	end
-	return lines
-end
-
+---
 --- @param offset Offset[]
 --- @param diff number
 function change_offset(offset, diff)
@@ -49,18 +36,19 @@ end
 --- @param file_path string
 --- @param lines string[]
 --- @param highlight_content HighlightInstruction[]
+--- @param buffer_line_number number
 --- @return { line: string, highlight: HighlightInstruction }
-function render_file_path(file_path, lines, highlight_content)
+function render_file_path(file_path, lines, highlight_content, buffer_line_number)
 	local filename = file_path:match("([^/]+)$")
 	local file_extension = filename:match("^.+%.(.+)$")
 	local icon = devicon.get_icon(filename, file_extension, { default = true })
 	local highlight = {
-		buffer_line_number = 0,
+		buffer_line_number = buffer_line_number,
 		highlight_group = state.config.file_path_highlight_group,
 		offsets = {
 			{
 				start = 0,
-				finish = #file_path,
+				finish = -1,
 			},
 		},
 	}
@@ -109,11 +97,14 @@ function render_search_and_replace_content(buffer_line_number, line_output, high
 end
 
 --- @param grouped_search_outputs GroupedSearchOutput[]
+	-- elapsed should be a string of the form "0.123s". Read ripgrep's JSON output for more information.
+--- @param elapsed string
 --- @return { lines: string[], callback: function }
-function M.display_matches_v2(grouped_search_outputs)
+function M.display_matches_v2(grouped_search_outputs, elapsed)
 	local ns = vim.api.nvim_create_namespace("usearch")
 	local outputBuf = state.outputBuf
 	local lines = {}
+
 
 	-- A table to store what to highlight in the buffer. The key is the buffer line number(0-indexed).
 	---
@@ -142,10 +133,42 @@ function M.display_matches_v2(grouped_search_outputs)
 	end
 
 	local buffer_line_number = 0
+
+	local number_of_files = 0
+	local number_of_matches = 0
+
+	for _, output in ipairs(grouped_search_outputs) do
+		number_of_files = number_of_files + 1
+		number_of_matches = number_of_matches + #output["line_search_outputs"]
+	end
+
+	-- Insert metadata about the search results.
+	local file_or_files = pluralize(number_of_files, "file", "files")
+	local match_or_matches = pluralize(number_of_matches, "match", "matches")
+	local match_info = file_or_files .. " found with " .. match_or_matches .. " in "
+	local meta_line = match_info .. elapsed
+	table.insert(lines, meta_line)
+	table.insert(highlight_content, {
+		buffer_line_number = buffer_line_number,
+		highlight_group = state.config.elapsed_highlight_group,
+		offsets = {
+			{
+				start = #match_info,
+				finish = -1,
+			},
+		},
+	})
+	buffer_line_number = buffer_line_number + 1
+
+	table.insert(lines, "")
+
+	buffer_line_number = buffer_line_number + 1
+
+	-- Insert the search results into the buffer.
 	for it, output in ipairs(grouped_search_outputs) do
 		-- file path contains slash, so we need to split it.
 		local file_path = output["file_path"]
-		render_file_path(file_path, lines, highlight_content)
+		render_file_path(file_path, lines, highlight_content, buffer_line_number)
 		buffer_line_number = buffer_line_number + 1
 
 		for _, line_output in ipairs(output["line_search_outputs"]) do
@@ -167,6 +190,13 @@ function M.display_matches_v2(grouped_search_outputs)
 		lines = lines,
 		callback = highlight_callback,
 	}
+end
+
+function pluralize(n, singular, plural)
+	if n == 1 then
+		return n .. " " .. singular
+	end
+	return n .. " " .. plural
 end
 
 function M.display_error()

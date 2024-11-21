@@ -54,6 +54,7 @@ local M = {
 		replace_highlight_group = "CurSearch",
 		line_number_highlight_group = "LineNr",
 		file_path_highlight_group = "Title",
+		elapsed_highlight_group = "Number",
 	},
 
 	changed_files_with_seq_cur = changed_files_with_seq_cur,

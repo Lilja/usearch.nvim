@@ -112,7 +112,7 @@ function perform_search()
 		M.reduce_output_state()
 		return
 	end
-	local matches = matchesResult.data
+	local matches = matchesResult.data.output
 	if matches == nil then
 		state.error = { "Failed to search" }
 		M.reduce_output_state()
@@ -152,6 +152,7 @@ function M.perform_replace()
 		end
 	end
 	state.changed_files_with_seq_cur = changed_files_with_seq_cur
+	M.debug_buf_print(state.changed_files_with_seq_cur)
 end
 
 --- @param mode "new" | "toggle"
@@ -295,18 +296,7 @@ function M.drawUI(mode)
 		perform_search()
 	end
 
-	M.debug_buf_print({
-		"searchWin: " .. searchWin,
-		"replaceWin: " .. replaceWin,
-		"outputWin: " .. outputWin,
-		"ignoreWin: " .. ignoreWin,
-		"debugWin: " .. debugWin,
-		"searchBuf: " .. searchBuf,
-		"replaceBuf: " .. replaceBuf,
-		"outputBuf: " .. outputBuf,
-		"ignoreBuf: " .. ignoreBuf,
-		"debugBuf: " .. debugBuf,
-	})
+	M.debug_buf_print(state.changed_files_with_seq_cur)
 
 	-- Focus the search window
 	vim.api.nvim_set_current_win(searchWin)
@@ -347,8 +337,13 @@ function M.preview_search_results()
 		error("Error")
 	end
 
-	local pso = process.process_search_output(state.search_regex, state.replace_regex, so.data)
-	return process.group_up_search_outputs_by_filename(pso)
+	local data = so.data.output
+	local elapsed = so.data.elapsed
+	local pso = process.process_search_output(state.search_regex, state.replace_regex, data)
+	return {
+		results = process.group_up_search_outputs_by_filename(pso),
+		elapsed = elapsed,
+	}
 end
 
 function M.reduce_output_state()
@@ -367,7 +362,7 @@ function M.reduce_output_state()
 
 	if state.matches ~= nil then
 		local grouped_up_results = M.preview_search_results()
-		local result = ui_states.display_matches_v2(grouped_up_results)
+		local result = ui_states.display_matches_v2(grouped_up_results.results, grouped_up_results.elapsed)
 		return M.render_output_state(result.lines, result.callback)
 	end
 end

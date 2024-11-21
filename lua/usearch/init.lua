@@ -60,15 +60,4 @@ function M.toggle_search()
 	ui.drawUI("toggle")
 end
 
-function M.stuff()
-	local so = search.search_with_json("g")
-	if so.error ~= nil then
-		print(vim.inspect(so.error))
-		error("Error")
-		return
-	end
-
-	process.process_search_output("g", "Bar", so.data)
-end
-
 return M
