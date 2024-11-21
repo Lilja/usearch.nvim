@@ -41,8 +41,35 @@ function M.group_up_matches_and_craft_meta_data(matches)
 	}
 end
 
---- @alias LineSearchOutput { line_number: number, lines: string, search_offset: Offset[], replace_offset: Offset[] | nil }
---- @alias GroupedSearchOutput { file_path: string, line_search_outputs: LineSearchOutput[] }
+--- @param search_output SearchOutput[]
+--- @return FileMatch[]
+function M.search_output_file_and_line(search_output)
+	-- Inside of search_output, there are multiple matches for a single file. We want to group them up by file.
+	--- @type { [string]: number[] }
+	local file_matches = {}
+
+	for _, output in ipairs(search_output) do
+		local file_path = output["file_path"]
+		if file_matches[file_path] == nil then
+			file_matches[file_path] = {}
+		end
+
+		table.insert(file_matches[file_path], output["line_number"])
+	end
+
+	--- @type FileMatch[]
+	local file_matches_final = {}
+
+	for file_path, line_numbers in pairs(file_matches) do
+		table.insert(file_matches_final, {
+			["file_path"] = file_path,
+			["line_number"] = line_numbers,
+		})
+	end
+
+	return file_matches_final
+end
+
 --- @param process_search_output ProcessedSearchOutput[]
 --- @return GroupedSearchOutput[]
 function M.group_up_search_outputs_by_filename(process_search_output)

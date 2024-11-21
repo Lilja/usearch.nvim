@@ -82,7 +82,19 @@ function M.display_matches_v2(grouped_search_outputs)
 		local filename = output["file_path"]:match("([^/]+)$")
 		local file_extension = filename:match("^.+%.(.+)$")
 		local icon = devicon.get_icon(filename, file_extension, { default = true })
-		table.insert(lines, icon .. " " .. output["file_path"])
+		local file_name_row = icon .. " " .. output["file_path"]
+		table.insert(lines, file_name_row)
+		-- Insert formatting for the file path. Use the Title highlight group.
+		table.insert(highlight_content, {
+			buffer_line_number = buffer_line_number,
+			highlight_group = "Title",
+			offsets = {
+				{
+					start = 0,
+					finish = #file_name_row,
+				},
+			},
+		})
 		buffer_line_number = buffer_line_number + 1
 
 		for _, line_output in ipairs(output["line_search_outputs"]) do

@@ -2,6 +2,7 @@ local pkg = "usearch"
 
 --- @alias LineSearchOutput { line_number: number, lines: string, search_offset: Offset[], replace_offset: Offset[] | nil }
 --- @alias GroupedSearchOutput { file_path: string, line_search_outputs: LineSearchOutput[] }
+--- @alias FileMatch { file_path: string, line_number: number[] }
 
 
 --- @type string | nil
@@ -16,8 +17,8 @@ local ignore = nil
 --- @type nil | string | string[]
 local error = nil
 
---- @type GroupedSearchOutput[]
-local grouped_search_outputs = {}
+--- @type FileMatch[]
+local matches = {}
 
 local M = {
 	initial = true,
@@ -40,7 +41,7 @@ local M = {
 
 	pkg = pkg,
 
-	grouped_search_outputs = grouped_search_outputs,
+	matches = matches,
 
 	error = error,
 }
@@ -64,7 +65,7 @@ function M.reset_state()
 	M.ignoreBuf = -1
 	M.debugBuf = -1
 
-	M.grouped_search_outputs = {}
+	M.matches = {}
 
 	M.error = nil
 

@@ -118,7 +118,7 @@ function perform_search()
 		M.reduce_output_state()
 		return
 	end
-	state.grouped_search_outputs = process.group_up_search_outputs_by_filename(matches)
+	state.matches = process.search_output_file_and_line(matches)
 
 	M.reduce_output_state()
 end
@@ -129,13 +129,11 @@ function M.perform_replace()
 	end
 
 	if state.replace_regex ~= nil then
-		for file_path, result in pairs(state.last_matches.grouped_matches) do
-			-- Flatten out the results to a number[]
-			local line_numbers = {}
-			for _, line_no in pairs(result.matches) do
-				table.insert(line_numbers, line_no)
-			end
-			local replaceResult = replace.perform_replace_on_file_path(file_path, line_numbers, state.search_regex, state.replace_regex)
+		for _, result in pairs(state.matches) do
+			local file_path = result["file_path"]
+			local line_numbers = result["line_number"]
+			local replaceResult =
+				replace.perform_replace_on_file_path(file_path, line_numbers, state.search_regex, state.replace_regex)
 			if replaceResult.error ~= nil then
 				state.error = replaceResult.error
 				M.reduce_output_state()
