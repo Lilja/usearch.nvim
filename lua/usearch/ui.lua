@@ -152,7 +152,11 @@ function M.perform_replace()
 		end
 	end
 	state.changed_files_with_seq_cur = changed_files_with_seq_cur
-	M.debug_buf_print(state.changed_files_with_seq_cur)
+	local dbg = {}
+	for _, result in pairs(state.matches) do
+		table.insert(dbg, result["file_path"] .. ":" .. result["line_number"])
+	end
+	M.debug_buf_print(dbg)
 end
 
 --- @param mode "new" | "toggle"
