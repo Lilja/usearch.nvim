@@ -356,12 +356,12 @@ function M.reduce_output_state()
 		return M.render_output_state(ui_states.display_error(), nil)
 	end
 
-	if state.search_regex == nil or #state.grouped_search_outputs == 0 then
+	if state.search_regex == nil or #state.matches == 0 then
 		local s = ui_states.empty_state()
 		return M.render_output_state(s, nil)
 	end
 
-	if state.grouped_search_outputs ~= nil then
+	if state.matches ~= nil then
 		local grouped_up_results = M.preview_search_results()
 		local result = ui_states.display_matches_v2(grouped_up_results)
 		return M.render_output_state(result.lines, result.callback)

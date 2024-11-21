@@ -44,6 +44,13 @@ local M = {
 	matches = matches,
 
 	error = error,
+
+	config = {
+		search_highlight_group = "IncSearch",
+		replace_highlight_group = "CurSearch",
+		line_number_highlight_group = "LineNr",
+		file_path_highlight_group = "Title",
+	},
 }
 
 function M.reset_state()

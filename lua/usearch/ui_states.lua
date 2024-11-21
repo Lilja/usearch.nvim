@@ -77,7 +77,7 @@ function M.display_matches_v2(grouped_search_outputs)
 	end
 
 	local buffer_line_number = 0
-	for _, output in ipairs(grouped_search_outputs) do
+	for it, output in ipairs(grouped_search_outputs) do
 		-- file path contains slash, so we need to split it.
 		local filename = output["file_path"]:match("([^/]+)$")
 		local file_extension = filename:match("^.+%.(.+)$")
@@ -87,7 +87,7 @@ function M.display_matches_v2(grouped_search_outputs)
 		-- Insert formatting for the file path. Use the Title highlight group.
 		table.insert(highlight_content, {
 			buffer_line_number = buffer_line_number,
-			highlight_group = "Title",
+			highlight_group = state.config.file_path_highlight_group,
 			offsets = {
 				{
 					start = 0,
@@ -111,7 +111,7 @@ function M.display_matches_v2(grouped_search_outputs)
 			-- Insert formatting for the line number. Use the LineNr highlight group.
 			table.insert(highlight_content, {
 				buffer_line_number = buffer_line_number,
-				highlight_group = "LineNr",
+				highlight_group = state.config.line_number_highlight_group,
 				offsets = {
 					{
 						start = 0,
@@ -123,7 +123,7 @@ function M.display_matches_v2(grouped_search_outputs)
 			-- table.insert(search_offsets[buffer_line_number], line_output.search_offset)
 			table.insert(highlight_content, {
 				buffer_line_number = buffer_line_number,
-				highlight_group = "IncSearch",
+				highlight_group = state.config.search_highlight_group,
 				offsets = search_offsets,
 			})
 			if line_output.replace_offset ~= nil then
@@ -132,15 +132,18 @@ function M.display_matches_v2(grouped_search_outputs)
 				end
 				table.insert(highlight_content, {
 					buffer_line_number = buffer_line_number,
-					highlight_group = "CurSearch",
+					highlight_group = state.config.replace_highlight_group,
 					offsets = replace_offsets,
 				})
 			end
 			buffer_line_number = buffer_line_number + 1
 		end
-		-- local _search_offsets = output["search_offset"]
-		-- table.insert(lines, output["line"])
-		-- table.insert(search_offsets, _search_offsets)
+
+		-- If there are more files to display, add a newline.
+		if it < #grouped_search_outputs then
+			table.insert(lines, "")
+			buffer_line_number = buffer_line_number + 1
+		end
 	end
 	return {
 		lines = lines,
