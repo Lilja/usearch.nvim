@@ -27,6 +27,27 @@ function M.open_file_and_change_it(file_path, changes)
 	return undo_seq_cur
 end
 
+--- Rollback the changes made to a file_path
+--- @param file_path string
+--- @param seq_cur number
+function M.rollback_file(file_path, seq_cur)
+	local buf = vim.fn.bufadd(file_path)
+	vim.fn.bufload(buf)
+
+	-- Restore the buffer to the state it was before the search and replace
+	vim.api.nvim_buf_call(buf, function()
+		local buf_seq_cur = vim.fn.undotree(buf).seq_cur
+		if buf_seq_cur == seq_cur then
+			-- Our stored seq_cur is the same as the current seq_cur. Which means that if we undo now, we will undo the changes we made.
+			vim.cmd("undo")
+			vim.cmd("write")
+		end
+	end)
+
+	-- Close the buffer
+	vim.api.nvim_buf_delete(buf, { force = true })
+end
+
 --- Perform a search and replace on a file_path. The changes are a list of line numbers and the new content to replace the line with.
 --- @param file_path string
 --- @param line_numbers number[]

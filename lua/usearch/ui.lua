@@ -128,6 +128,7 @@ function M.perform_replace()
 		return
 	end
 
+	--- @type FileChange
 	local changed_files_with_seq_cur = {}
 
 	if state.replace_regex ~= nil then
@@ -147,14 +148,14 @@ function M.perform_replace()
 				M.reduce_output_state()
 				return
 			end
-			replace.open_file_and_change_it(file_path, data)
-			table.insert(changed_files_with_seq_cur, { file_path = file_path, seq_cur = data })
+			local num = replace.open_file_and_change_it(file_path, data)
+			table.insert(changed_files_with_seq_cur, { file_path = file_path, seq_cur = num })
 		end
 	end
 	state.changed_files_with_seq_cur = changed_files_with_seq_cur
 	local dbg = {}
-	for _, result in pairs(state.matches) do
-		table.insert(dbg, result["file_path"] .. ":" .. result["line_number"])
+	for _, result in pairs(state.changed_files_with_seq_cur) do
+		table.insert(dbg, result.file_path .. ": " .. result.seq_cur)
 	end
 	M.debug_buf_print(dbg)
 end

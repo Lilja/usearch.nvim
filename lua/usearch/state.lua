@@ -21,7 +21,8 @@ local error = nil
 local matches = {}
 
 -- A table to store the current undo state of the files that was search and replaced.
---- @type { file_path: string, seq_cur: number }[]
+--- @alias FileChange { file_path: string, seq_cur: number }[]
+--- @type FileChange
 local changed_files_with_seq_cur = {}
 
 local M = {

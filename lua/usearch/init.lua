@@ -1,6 +1,5 @@
 local ui = require("usearch.ui")
-local process = require("usearch.process")
-local search = require("usearch.search")
+local replace = require("usearch.replace")
 
 local M = {}
 
@@ -58,6 +57,17 @@ end
 
 function M.toggle_search()
 	ui.drawUI("toggle")
+end
+
+function M.rollback()
+	local state = require("usearch.state")
+	local changed_files_with_seq_cur = state.changed_files_with_seq_cur
+	for _, file_change in ipairs(changed_files_with_seq_cur) do
+		local file_path = file_change["file_path"]
+		local seq_cur = file_change["seq_cur"]
+		replace.rollback_file(file_path, seq_cur)
+	end
+
 end
 
 return M
