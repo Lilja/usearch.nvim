@@ -7,12 +7,13 @@ local replace = require("usearch.replace")
 local M = {}
 
 --- @param buf number
---- @param outputBuf number
+--- @param _outputBuf number
 --- @param callback fun(contents: string[]): nil
-function M.listen_for_mode_change_in_buf(buf, outputBuf, callback)
+function M.listen_for_mode_change_in_buf(buf, _outputBuf, callback)
 	-- Listen for input changes in the buffer
 	-- We want to display the search results in the output buffer, but only when the user is done typing.
-	-- The InsertLeave event is triggered when the user leaves insert mode, so we can use that to detect when the user is done typing.
+	-- The InsertLeave event is triggered when the user leaves insert mode.
+	-- So we can use that to detect when the user is done typing.
 
 	vim.api.nvim_create_autocmd("InsertLeave", {
 		buffer = buf,
@@ -92,17 +93,7 @@ function M.bind_escape_to_all_buffers()
 	end
 end
 
---- @param results { file_path: string, line_no: string }[]
-function render_search_results(results)
-	local lines = {}
-	for _, result in ipairs(results) do
-		table.insert(lines, result["file_path"])
-		table.insert(lines, result["line_no"])
-	end
-	return lines
-end
-
-function perform_search()
+function M.perform_search()
 	if state.search_regex == nil or state.search_regex == "" then
 		return
 	end
@@ -119,6 +110,13 @@ function perform_search()
 		return
 	end
 	state.matches = process.search_output_file_and_line(matches)
+	local dbg = {}
+	for _, result in pairs(state.matches) do
+		print(vim.inspect(result))
+		local line_numbers = result["line_numbers"]
+		table.insert(dbg, result["file_path"] .. ": " .. vim.inspect(line_numbers))
+	end
+	M.debug_buf_print(dbg)
 
 	M.reduce_output_state()
 end
@@ -134,7 +132,9 @@ function M.perform_replace()
 	if state.replace_regex ~= nil then
 		for _, result in pairs(state.matches) do
 			local file_path = result["file_path"]
-			local line_numbers = result["line_number"]
+			local line_numbers = result["line_numbers"]
+			print(vim.inspect(line_numbers))
+			print(vim.inspect(file_path))
 			local replaceResult =
 				replace.perform_replace_on_file_path(file_path, line_numbers, state.search_regex, state.replace_regex)
 			if replaceResult.error ~= nil then
@@ -143,6 +143,7 @@ function M.perform_replace()
 				return
 			end
 			local data = replaceResult.data
+			print("Data: " .. vim.inspect(data))
 			if data == nil then
 				state.error = { "Failed to replace" }
 				M.reduce_output_state()
@@ -187,19 +188,19 @@ function M.drawUI(mode)
 		state.initial = false
 		state.search_regex = regex
 		state.error = nil
-		perform_search()
+		M.perform_search()
 	end)
 	M.listen_for_mode_change_in_buf(replaceBuf, outputBuf, function(contents)
 		state.initial = false
 		state.replace_regex = contents[1]
 		state.error = nil
-		perform_search()
+		M.perform_search()
 	end)
 	M.listen_for_mode_change_in_buf(ignoreBuf, outputBuf, function(contents)
 		state.initial = false
 		state.ignore = contents[1]
 		state.error = nil
-		perform_search()
+		M.perform_search()
 	end)
 
 	-- Create the search buffer, it's located on the top of the screen
@@ -267,7 +268,8 @@ function M.drawUI(mode)
 		title_pos = "center",
 	})
 
-	-- Bind keybinds to the buffers, you should navigate vertically and then switch to the output buffer, and back to the search buffer.
+	-- Bind keybinds to the buffers,
+	-- you should navigate vertically and then switch to the output buffer, and back to the search buffer.
 	M.bind_keybinds_to_buf(searchBuf, "replace", "output")
 	M.bind_keybinds_to_buf(replaceBuf, "ignore", "search")
 	M.bind_keybinds_to_buf(ignoreBuf, "debug", "replace")
@@ -298,7 +300,7 @@ function M.drawUI(mode)
 		if state.ignore ~= nil then
 			vim.api.nvim_buf_set_lines(ignoreBuf, 0, -1, false, { state.ignore })
 		end
-		perform_search()
+		M.perform_search()
 	end
 
 	M.debug_buf_print(state.changed_files_with_seq_cur)

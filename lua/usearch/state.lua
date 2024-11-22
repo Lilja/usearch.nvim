@@ -1,9 +1,23 @@
 local pkg = "usearch"
 
---- @alias LineSearchOutput { line_number: number, lines: string, search_offset: Offset[], replace_offset: Offset[] | nil }
---- @alias GroupedSearchOutput { file_path: string, line_search_outputs: LineSearchOutput[] }
---- @alias FileMatch { file_path: string, line_number: number[] }
+--- @alias Submatch { match: string, start: number, finish: number }
 
+-- Beware: The `start` and `finish` are 0-based indices.
+--- @alias RipgrepSearchOutput { file_path: string, lines: string, line_number: number, submatches: Submatch[] }
+
+-- Beware: The `start` and `finish` are 1-based indices.
+--- @alias LuaSearchOutput { file_path: string, line: string, line_number_0i: number, submatches: Submatch[] }
+
+--- @alias LineSearchOutput {
+--- line_number: number,
+--- lines: string,
+--- search_offset: Offset[],
+--- replace_offset: Offset[] | nil
+--- }
+
+--- @alias GroupedSearchOutput { file_path: string, line_search_outputs: LineSearchOutput[] }
+
+--- @alias FileMatch { file_path: string, line_numbers: number[] }
 
 --- @type string | nil
 local search_regex = nil

@@ -1,5 +1,6 @@
 local state = require("usearch.state")
 local devicon = require("nvim-web-devicons")
+local util = require("usearch.util")
 
 local M = {}
 --- @alias HighlightInstruction { buffer_line_number: number, highlight_group: string, offsets: Offset[]}
@@ -18,27 +19,13 @@ function M.initial_state()
 		"Begin by entering a search term in the search buffer.",
 	}
 end
----
---- @param offset Offset[]
---- @param diff number
-function change_offset(offset, diff)
-	--- @type Offset[]
-	local new_offset = {}
-	for _, o in ipairs(offset) do
-		table.insert(new_offset, {
-			start = o.start + diff,
-			finish = o.finish + diff,
-		})
-	end
-	return new_offset
-end
 
 --- @param file_path string
 --- @param lines string[]
 --- @param highlight_content HighlightInstruction[]
 --- @param buffer_line_number number
 --- @return { line: string, highlight: HighlightInstruction }
-function render_file_path(file_path, lines, highlight_content, buffer_line_number)
+local function render_file_path(file_path, lines, highlight_content, buffer_line_number)
 	local filename = file_path:match("([^/]+)$")
 	local file_extension = filename:match("^.+%.(.+)$")
 	local icon = devicon.get_icon(filename, file_extension, { default = true })
@@ -60,12 +47,12 @@ end
 --- @param buffer_line_number number
 --- @param line_output LineSearchOutput
 --- @param highlight_content HighlightInstruction[]
-function render_search_and_replace_content(buffer_line_number, line_output, highlight_content)
+local function render_search_and_replace_content(buffer_line_number, line_output, highlight_content)
 	local search_offsets = line_output.search_offset
 	local replace_offsets = line_output.replace_offset
-	search_offsets = change_offset(search_offsets, #tostring(line_output.line_number) + 1)
+	search_offsets = util.change_offset(search_offsets, #tostring(line_output.line_number) + 1)
 	if replace_offsets ~= nil then
-		replace_offsets = change_offset(replace_offsets, #tostring(line_output.line_number) + 1)
+		replace_offsets = util.change_offset(replace_offsets, #tostring(line_output.line_number) + 1)
 	end
 	-- Insert formatting for the line number. Use the LineNr highlight group.
 	table.insert(highlight_content, {
@@ -97,14 +84,13 @@ function render_search_and_replace_content(buffer_line_number, line_output, high
 end
 
 --- @param grouped_search_outputs GroupedSearchOutput[]
-	-- elapsed should be a string of the form "0.123s". Read ripgrep's JSON output for more information.
+-- elapsed should be a string of the form "0.123s". Read ripgrep's JSON output for more information.
 --- @param elapsed string
 --- @return { lines: string[], callback: function }
 function M.display_matches_v2(grouped_search_outputs, elapsed)
 	local ns = vim.api.nvim_create_namespace("usearch")
 	local outputBuf = state.outputBuf
 	local lines = {}
-
 
 	-- A table to store what to highlight in the buffer. The key is the buffer line number(0-indexed).
 	---
@@ -143,8 +129,8 @@ function M.display_matches_v2(grouped_search_outputs, elapsed)
 	end
 
 	-- Insert metadata about the search results.
-	local file_or_files = pluralize(number_of_files, "file", "files")
-	local match_or_matches = pluralize(number_of_matches, "match", "matches")
+	local file_or_files = util.pluralize(number_of_files, "file", "files")
+	local match_or_matches = util.pluralize(number_of_matches, "match", "matches")
 	local match_info = file_or_files .. " found with " .. match_or_matches .. " in "
 	local meta_line = match_info .. elapsed
 	table.insert(lines, meta_line)
@@ -190,13 +176,6 @@ function M.display_matches_v2(grouped_search_outputs, elapsed)
 		lines = lines,
 		callback = highlight_callback,
 	}
-end
-
-function pluralize(n, singular, plural)
-	if n == 1 then
-		return n .. " " .. singular
-	end
-	return n .. " " .. plural
 end
 
 function M.display_error()

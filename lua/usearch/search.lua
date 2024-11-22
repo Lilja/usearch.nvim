@@ -1,12 +1,11 @@
 local M = {}
 
---- @alias Submatch { match: string, start: number, finish: number }
---- @alias SearchOutput { file_path: string, lines: string, line_number: number, submatches: Submatch[] }
 --- @param search string
 --- @param ignore string|nil
---- @return { data: {elapsed: string, output: SearchOutput[]} | nil, error: string | string[] | nil }
+--- @return { data: {elapsed: string, output: RipgrepSearchOutput[]} | nil, error: string | string[] | nil }
 function M.search_with_json(search, ignore)
-	-- Perform a search with ripgrep using --json flag. This will return a more detailed output that we are able to later highlight in neovim.
+	-- Perform a search with ripgrep using --json flag.
+	-- This will return a more detailed output that we are able to later highlight in neovim.
 	local rg_args = {
 		"--json",
 	}
@@ -50,7 +49,7 @@ function M.search_with_json(search, ignore)
 	end
 
 	-- Finally, we can return the appropriate data
-	--- @type SearchOutput[]
+	--- @type RipgrepSearchOutput[]
 	local search_output = {}
 
 	for _, match in ipairs(matches) do
@@ -64,8 +63,8 @@ function M.search_with_json(search, ignore)
 		for _, submatch in ipairs(raw_submatches) do
 			table.insert(submatches, {
 				match = submatch["match"]["text"],
-				start = submatch["start"] + 1,
-				finish = submatch["end"] + 1,
+				start = submatch["start"],
+				finish = submatch["end"],
 			})
 		end
 

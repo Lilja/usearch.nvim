@@ -1,47 +1,9 @@
 local replace = require("usearch.replace")
+local util = require("usearch.util")
 
 local M = {}
 
---- @param matches { file_path: string, line_no: string }[]
---- @return { matches: { file_path: string, line_no: string }[], matches_count: number, unique_file_paths: { [string]: boolean }, grouped_matches: { [string]: { matches: { file_path: string, line_no: string }[], count: number } } }
-function M.group_up_matches_and_craft_meta_data(matches)
-	--- @type { [string]: boolean }
-	local unique_file_paths = {}
-
-	--- @type { [string]: { matches: { file_path: string, line_no: string }[], count: number } }
-	local grouped_matches = {}
-
-	local count = 0
-	for _, m in ipairs(matches) do
-		-- table.insert(matches, m)
-
-		local key = m["file_path"]
-		unique_file_paths[key] = true
-		count = count + 1
-	end
-
-	for _, m in ipairs(matches) do
-		local key = m["file_path"]
-		if grouped_matches[key] == nil then
-			grouped_matches[key] = {
-				["matches"] = {},
-				["count"] = 0,
-			}
-		end
-
-		table.insert(grouped_matches[key]["matches"], m["line_no"])
-		grouped_matches[key]["count"] = grouped_matches[key]["count"] + 1
-	end
-
-	return {
-		matches = matches,
-		matches_count = count,
-		unique_file_paths = unique_file_paths,
-		grouped_matches = grouped_matches,
-	}
-end
-
---- @param search_output SearchOutput[]
+--- @param search_output RipgrepSearchOutput[]
 --- @return FileMatch[]
 function M.search_output_file_and_line(search_output)
 	-- Inside of search_output, there are multiple matches for a single file. We want to group them up by file.
@@ -63,7 +25,7 @@ function M.search_output_file_and_line(search_output)
 	for file_path, line_numbers in pairs(file_matches) do
 		table.insert(file_matches_final, {
 			["file_path"] = file_path,
-			["line_number"] = line_numbers,
+			["line_numbers"] = line_numbers,
 		})
 	end
 
@@ -110,15 +72,23 @@ function M.group_up_search_outputs_by_filename(process_search_output)
 end
 
 --- @alias Offset { start: number, finish: number }
---- @alias ProcessedSearchOutput { line: string, search_offset: Offset[], replace_offset: Offset[] | nil, file_path: string, line_number: number }
+--- @alias ProcessedSearchOutput {
+---   line: string,
+---   search_offset: Offset[],
+---   replace_offset: Offset[] | nil,
+---   file_path: string,
+---   line_number: number,
+--- }
 --- @param search string
 --- @param replacer string
---- @param search_output SearchOutput[]
+--- @param search_output RipgrepSearchOutput[]
 --- @return ProcessedSearchOutput[]
 function M.process_search_output(search, replacer, search_output)
 	local changes = {}
 
-	for _, output in ipairs(search_output) do
+	local lua_search_output = util.convert_line_numbers_and_matches(search_output)
+
+	for _, output in ipairs(lua_search_output) do
 		local line = output["lines"]
 
 		local new_lines = line
@@ -137,7 +107,8 @@ function M.process_search_output(search, replacer, search_output)
 			for _, match in ipairs(output.submatches) do
 				local start = match.start
 				local finish = match.finish
-				-- The offsets from ripgrep are 0-based. We're about to do some string manipulation in lua, so we need to adjust the offsets to be 1-based
+				-- The offsets from ripgrep are 0-based.
+				-- We're about to do some string manipulation in lua, so we need to adjust the offsets to be 1-based
 				table.insert(search_offsets, {
 					["start"] = start - 1,
 					["finish"] = finish - 1,
@@ -172,7 +143,8 @@ function M.process_search_output(search, replacer, search_output)
 				local replace_offset_adjusted_start = search_offset_adjusted_end
 				local replace_offset_adjusted_end = replace_offset_adjusted_start + new_content_length
 
-				-- The offsets from ripgrep are 0-based. We're about to do some string manipulation in lua, so we need to adjust the offsets to be 1-based
+				-- The offsets from ripgrep are 0-based.
+				-- We're about to do some string manipulation in lua, so we need to adjust the offsets to be 1-based
 				table.insert(search_offsets, {
 					["start"] = search_offset_adjusted_start - 1,
 					["finish"] = search_offset_adjusted_end - 1,
