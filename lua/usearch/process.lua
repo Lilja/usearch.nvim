@@ -82,7 +82,7 @@ end
 --- @param search string
 --- @param replacer string
 --- @param search_output RipgrepSearchOutput[]
---- @return ProcessedSearchOutput[]
+--- @return { data: ProcessedSearchOutput[] | nil, error: string[] | nil }
 function M.process_search_output(search, replacer, search_output)
 	local changes = {}
 
@@ -124,7 +124,10 @@ function M.process_search_output(search, replacer, search_output)
 
 				local new_line_result = replace.replace_in_line(content, search, replacer)
 				if new_line_result.error ~= nil then
-					error("Error")
+					return {
+						data = nil,
+						error = new_line_result.error,
+					}
 				end
 				--- @type string
 				local new_content = new_line_result.data
@@ -170,7 +173,10 @@ function M.process_search_output(search, replacer, search_output)
 		})
 	end
 
-	return changes
+	return {
+		data = changes,
+		error = nil,
+	}
 end
 
 return M

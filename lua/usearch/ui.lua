@@ -112,7 +112,6 @@ function M.perform_search()
 	state.matches = process.search_output_file_and_line(matches)
 	local dbg = {}
 	for _, result in pairs(state.matches) do
-		print(vim.inspect(result))
 		local line_numbers = result["line_numbers"]
 		table.insert(dbg, result["file_path"] .. ": " .. vim.inspect(line_numbers))
 	end
@@ -133,8 +132,6 @@ function M.perform_replace()
 		for _, result in pairs(state.matches) do
 			local file_path = result["file_path"]
 			local line_numbers = result["line_numbers"]
-			print(vim.inspect(line_numbers))
-			print(vim.inspect(file_path))
 			local replaceResult =
 				replace.perform_replace_on_file_path(file_path, line_numbers, state.search_regex, state.replace_regex)
 			if replaceResult.error ~= nil then
@@ -337,7 +334,7 @@ function M.render_output_state(data_to_render, highlight_callback)
 	end
 end
 
-function M.preview_search_results()
+local function preview_search_results()
 	local so = search.search_with_json(state.search_regex, state.ignore)
 	if so.error ~= nil then
 		print(vim.inspect(so.error))
@@ -347,8 +344,24 @@ function M.preview_search_results()
 	local data = so.data.output
 	local elapsed = so.data.elapsed
 	local pso = process.process_search_output(state.search_regex, state.replace_regex, data)
+	local error = pso.error
+	if error ~= nil then
+		state.error = error
+		return {
+			results = ui_states.display_error(),
+			elapsed = elapsed,
+		}
+	end
+	local pso_data = pso.data
+	if pso_data == nil then
+		state.error = { "Failed to process search output" }
+		return {
+			results = ui_states.display_error(),
+			elapsed = elapsed,
+		}
+	end
 	return {
-		results = process.group_up_search_outputs_by_filename(pso),
+		results = process.group_up_search_outputs_by_filename(pso_data),
 		elapsed = elapsed,
 	}
 end
@@ -368,7 +381,7 @@ function M.reduce_output_state()
 	end
 
 	if state.matches ~= nil then
-		local grouped_up_results = M.preview_search_results()
+		local grouped_up_results = preview_search_results()
 		local result = ui_states.display_matches_v2(grouped_up_results.results, grouped_up_results.elapsed)
 		return M.render_output_state(result.lines, result.callback)
 	end

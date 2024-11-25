@@ -73,7 +73,7 @@ function M.perform_replace_on_file_path(file_path, line_numbers, search, replace
 		-- Also, we are performing the replace globally, as we want to replace all
 		-- occurrences of the search string in the line.
 		-- Hence, we use the g flag at the end of the sed command.
-		local sed_replace_command = "sed -E 's#" .. search .. "#" .. replacer .. "#g'"
+		local sed_replace_command = "perl -pe 's#" .. search .. "#" .. replacer .. "#g'"
 
 		-- We want to pipe the output of the first command to the second command,
 		-- we don't want to do the replacement in the file,
@@ -110,8 +110,9 @@ end
 --- @param contents string
 --- @param search string
 --- @param replacer string
+--- @return { data: string | nil, error: string[] | nil }
 function M.replace_in_line(contents, search, replacer)
-	local sed_command = "echo '" .. contents .. "' | sed -E 's#" .. search .. "#" .. replacer .. "#g'; echo $?"
+	local sed_command = "echo '" .. contents .. "' | perl -pe 's#" .. search .. "#" .. replacer .. "#g'; echo $?"
 
 	local handle = io.popen(sed_command)
 	if handle == nil then
