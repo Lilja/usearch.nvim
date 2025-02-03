@@ -2,10 +2,9 @@ local M = {}
 
 <<<<<<< HEAD
 local function escape_perl_special_chars(str)
-	return str
-		:gsub("@", "\\@")
-		:gsub("\\", "\\\\") -- Escape backslashes properly
-		:gsub("%$", "\\$") -- Escape $
+    return str:gsub("@", "\\@")
+              :gsub("\\", "\\\\")  -- Escape backslashes properly
+              :gsub("%$", "\\$")   -- Escape $
 end
 
 ||||||| d57b24c (Escape chars)
@@ -129,15 +128,7 @@ end
 --- @param replacer string
 --- @return { data: string | nil, error: string[] | nil }
 function M.replace_in_line(contents, search, replacer)
-	local escaped_search = escape_perl_special_chars(search)
-	local escaped_replacer = escape_perl_special_chars(replacer)
-	local sed_command = "echo '"
-		.. contents
-		.. "' | perl -pe 's#"
-		.. escaped_search
-		.. "#"
-		.. escaped_replacer
-		.. "#g'; echo $?"
+	local sed_command = "echo '" .. contents .. "' | perl -pe 's#" .. search .. "#" .. replacer .. "#g'; echo $?"
 
 	local handle = io.popen(sed_command)
 	if handle == nil then
