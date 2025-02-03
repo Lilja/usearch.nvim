@@ -1,21 +1,5 @@
 local M = {}
 
-<<<<<<< HEAD
-local function escape_perl_special_chars(str)
-    return str:gsub("@", "\\@")
-              :gsub("\\", "\\\\")  -- Escape backslashes properly
-              :gsub("%$", "\\$")   -- Escape $
-end
-
-||||||| d57b24c (Escape chars)
-local function escape_perl_special_chars(str)
-    return str:gsub("@", "\\@")
-              :gsub("\\", "\\\\")  -- Escape backslashes properly
-              :gsub("%$", "\\$")   -- Escape $
-end
-
-=======
->>>>>>> parent of d57b24c (Escape chars)
 --- Changes the contents of a file_path.
 --- The changes are a list of line numbers and the new content to replace the line with.
 --- @param file_path string
