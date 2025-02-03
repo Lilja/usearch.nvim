@@ -1,5 +1,6 @@
 local M = {}
 
+<<<<<<< HEAD
 local function escape_perl_special_chars(str)
 	return str
 		:gsub("@", "\\@")
@@ -7,6 +8,15 @@ local function escape_perl_special_chars(str)
 		:gsub("%$", "\\$") -- Escape $
 end
 
+||||||| d57b24c (Escape chars)
+local function escape_perl_special_chars(str)
+    return str:gsub("@", "\\@")
+              :gsub("\\", "\\\\")  -- Escape backslashes properly
+              :gsub("%$", "\\$")   -- Escape $
+end
+
+=======
+>>>>>>> parent of d57b24c (Escape chars)
 --- Changes the contents of a file_path.
 --- The changes are a list of line numbers and the new content to replace the line with.
 --- @param file_path string
@@ -72,11 +82,6 @@ function M.perform_replace_on_file_path(file_path, line_numbers, search, replace
 	for _, line_no in pairs(line_numbers) do
 		-- Open the file using sed and get to the specific line number
 		local sed_read_line_command = "sed -n " .. line_no .. "p " .. file_path
-
-		-- Escape the search and replacer strings
-		-- Since symbols like $ and @ have special meanings in perl, we need to escape them
-		local escaped_search = escape_perl_special_chars(search)
-		local escaped_replacer = escape_perl_special_chars(replacer)
 		--
 		-- Next, pipe the output of the command to sed to replace the search string with the replacer string
 		-- We assume the search string is a modern regex variant, so we use the -E flag
@@ -85,7 +90,7 @@ function M.perform_replace_on_file_path(file_path, line_numbers, search, replace
 		-- Also, we are performing the replace globally, as we want to replace all
 		-- occurrences of the search string in the line.
 		-- Hence, we use the g flag at the end of the sed command.
-		local sed_replace_command = "perl -pe 's#" .. escaped_search .. "#" .. escaped_replacer .. "#g'"
+		local sed_replace_command = "perl -pe 's#" .. search .. "#" .. replacer .. "#g'"
 
 		-- We want to pipe the output of the first command to the second command,
 		-- we don't want to do the replacement in the file,
